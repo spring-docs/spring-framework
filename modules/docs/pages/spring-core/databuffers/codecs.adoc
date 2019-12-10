@@ -1,0 +1,17 @@
+include::page$attributes.adoc[]
+[[codecs]]
+== Codecs
+
+The `org.springframework.core.codec` package provides the following strategy interfaces:
+
+* `Encoder` to encode `Publisher<T>` into a stream of data buffers.
+* `Decoder` to decode `Publisher<DataBuffer>` into a stream of higher level objects.
+
+The `spring-core` module provides `byte[]`, `ByteBuffer`, `DataBuffer`, `Resource`, and
+`String` encoder and decoder implementations. The `spring-web` module adds Jackson JSON,
+Jackson Smile, JAXB2, Protocol Buffers and other encoders and decoders. See
+xref:webflux:webflux-reactive-spring-web:webflux-codecs.adoc#webflux-codecs[Codecs] in the WebFlux section.
+
+
+
+

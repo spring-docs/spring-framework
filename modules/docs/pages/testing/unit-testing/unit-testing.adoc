@@ -1,0 +1,23 @@
+include::page$attributes.adoc[]
+[[unit-testing]]
+== Unit Testing
+
+Dependency injection should make your code less dependent on the container than it would
+be with traditional Java EE development. The POJOs that make up your application should
+be testable in JUnit or TestNG tests, with objects instantiated by using the `new`
+operator, without Spring or any other container. You can use xref:unit-testing:mock-objects.adoc#mock-objects[mock objects]
+(in conjunction with other valuable testing techniques) to test your code in isolation.
+If you follow the architecture recommendations for Spring, the resulting clean layering
+and componentization of your codebase facilitate easier unit testing. For example,
+you can test service layer objects by stubbing or mocking DAO or repository interfaces,
+without needing to access persistent data while running unit tests.
+
+True unit tests typically run extremely quickly, as there is no runtime infrastructure to
+set up. Emphasizing true unit tests as part of your development methodology can boost
+your productivity. You may not need this section of the testing chapter to help you write
+effective unit tests for your IoC-based applications. For certain unit testing scenarios,
+however, the Spring Framework provides mock objects and testing support classes, which
+are described in this chapter.
+
+
+

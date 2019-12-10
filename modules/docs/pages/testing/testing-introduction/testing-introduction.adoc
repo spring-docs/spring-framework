@@ -1,0 +1,13 @@
+include::page$attributes.adoc[]
+[[testing-introduction]]
+== Introduction to Spring Testing
+
+Testing is an integral part of enterprise software development. This chapter focuses on
+the value added by the IoC principle to xref:unit-testing:unit-testing.adoc#unit-testing[unit testing] and on the benefits
+of the Spring Framework's support for xref:integration-testing:integration-testing.adoc#integration-testing[integration testing]. (A
+thorough treatment of testing in the enterprise is beyond the scope of this reference
+manual.)
+
+
+
+

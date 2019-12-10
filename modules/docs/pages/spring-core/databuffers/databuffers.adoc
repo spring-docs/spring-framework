@@ -1,0 +1,20 @@
+include::page$attributes.adoc[]
+[[databuffers]]
+= Data Buffers and Codecs
+
+Java NIO provides `ByteBuffer` but many libraries build their own byte buffer API on top,
+especially for network operations where reusing buffers and/or using direct buffers is
+beneficial for performance. For example Netty has the `ByteBuf` hierarchy, Undertow uses
+XNIO, Jetty uses pooled byte buffers with a callback to be released, and so on.
+The `spring-core` module provides a set of abstractions to work with various byte buffer
+APIs as follows:
+
+* xref:databuffers:databuffers-factory.adoc#databuffers-factory[databuffers-factory] abstracts the creation of a data buffer.
+* xref:databuffers:databuffers-buffer.adoc#databuffers-buffer[databuffers-buffer] represents a byte buffer, which may be
+xref:databuffers:databuffers-buffer-pooled.adoc#databuffers-buffer-pooled[pooled].
+* xref:databuffers:databuffers-utils.adoc#databuffers-utils[databuffers-utils] offers utility methods for data buffers.
+* xref:databuffers:codecs.adoc#Codecs[Codecs] decode or encode streams data buffer streams into higher level objects.
+
+
+
+

@@ -1,0 +1,2162 @@
+include::page$attributes.adoc[]
+[[webflux-controller]]
+== Annotated Controllers
+[.small]#xref:mvc:mvc-controller.adoc#mvc-controller[Web MVC]#
+
+Spring WebFlux provides an annotation-based programming model, where `@Controller` and
+`@RestController` components use annotations to express request mappings, request input,
+handle exceptions, and more. Annotated controllers have flexible method signatures and
+do not have to extend base classes nor implement specific interfaces.
+
+The following listing shows a basic example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@RestController
+	public class HelloController {
+
+		@GetMapping("/hello")
+		public String handle() {
+			return "Hello WebFlux";
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@RestController
+	class HelloController {
+
+		@GetMapping("/hello")
+		fun handle() = "Hello WebFlux"
+	}
+----
+
+In the preceding example, the method returns a `String` to be written to the response body.
+
+
+
+[[webflux-ann-controller]]
+=== `@Controller`
+[.small]#xref:mvc:mvc-controller:mvc-ann-controller.adoc#mvc-ann-controller[Web MVC]#
+
+You can define controller beans by using a standard Spring bean definition.
+The `@Controller` stereotype allows for auto-detection and is aligned with Spring general support
+for detecting `@Component` classes in the classpath and auto-registering bean definitions
+for them. It also acts as a stereotype for the annotated class, indicating its role as
+a web component.
+
+To enable auto-detection of such `@Controller` beans, you can add component scanning to
+your Java configuration, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Configuration
+	@ComponentScan("org.example.web") // <1>
+	public class WebConfig {
+
+		// ...
+	}
+----
+<1> Scan the `org.example.web` package.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	@ComponentScan("org.example.web") // <1>
+	class WebConfig {
+
+		// ...
+	}
+----
+<1> Scan the `org.example.web` package.
+
+`@RestController` is a xref:beans:beans-classpath-scanning:beans-meta-annotations.adoc#beans-meta-annotations[composed annotation] that is
+itself meta-annotated with `@Controller` and `@ResponseBody`, indicating a controller whose
+every method inherits the type-level `@ResponseBody` annotation and, therefore, writes
+directly to the response body versus view resolution and rendering with an HTML template.
+
+
+
+[[webflux-ann-requestmapping]]
+=== Request Mapping
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping[Web MVC]#
+
+The `@RequestMapping` annotation is used to map requests to controllers methods. It has
+various attributes to match by URL, HTTP method, request parameters, headers, and media
+types. You can use it at the class level to express shared mappings or at the method level
+to narrow down to a specific endpoint mapping.
+
+There are also HTTP method specific shortcut variants of `@RequestMapping`:
+
+* `@GetMapping`
+* `@PostMapping`
+* `@PutMapping`
+* `@DeleteMapping`
+* `@PatchMapping`
+
+The preceding annotations are xref:webflux:webflux-controller:webflux-ann-requestmapping.adoc#webflux-ann-requestmapping-composed[webflux-ann-requestmapping-composed] that are provided
+because, arguably, most controller methods should be mapped to a specific HTTP method versus
+using `@RequestMapping`, which, by default, matches to all HTTP methods. At the same time, a
+`@RequestMapping` is still needed at the class level to express shared mappings.
+
+The following example uses type and method level mappings:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@RestController
+	@RequestMapping("/persons")
+	class PersonController {
+
+		@GetMapping("/{id}")
+		public Person getPerson(@PathVariable Long id) {
+			// ...
+		}
+
+		@PostMapping
+		@ResponseStatus(HttpStatus.CREATED)
+		public void add(@RequestBody Person person) {
+			// ...
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@RestController
+	@RequestMapping("/persons")
+	class PersonController {
+
+		@GetMapping("/{id}")
+		fun getPerson(@PathVariable id: Long): Person {
+			// ...
+		}
+
+		@PostMapping
+		@ResponseStatus(HttpStatus.CREATED)
+		fun add(@RequestBody person: Person) {
+			// ...
+		}
+	}
+----
+
+
+[[webflux-ann-requestmapping-uri-templates]]
+==== URI Patterns
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-uri-templates[Web MVC]#
+
+You can map requests by using glob patterns and wildcards:
+
+* `?` matches one character
+* `*` matches zero or more characters within a path segment
+* `**` match zero or more path segments
+
+You can also declare URI variables and access their values with `@PathVariable`,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	public Pet findPet(@PathVariable Long ownerId, @PathVariable Long petId) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	fun findPet(@PathVariable ownerId: Long, @PathVariable petId: Long): Pet {
+		// ...
+	}
+----
+
+You can declare URI variables at the class and method levels, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	@RequestMapping("/owners/{ownerId}") // <1>
+	public class OwnerController {
+
+		@GetMapping("/pets/{petId}") // <2>
+		public Pet findPet(@PathVariable Long ownerId, @PathVariable Long petId) {
+			// ...
+		}
+	}
+----
+<1> Class-level URI mapping.
+<2> Method-level URI mapping.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	@RequestMapping("/owners/{ownerId}") // <1>
+	class OwnerController {
+
+		@GetMapping("/pets/{petId}") // <2>
+		fun findPet(@PathVariable ownerId: Long, @PathVariable petId: Long): Pet {
+			// ...
+		}
+	}
+----
+<1> Class-level URI mapping.
+<2> Method-level URI mapping.
+
+
+URI variables are automatically converted to the appropriate type or a `TypeMismatchException`
+is raised. Simple types (`int`, `long`, `Date`, and so on) are supported by default and you can
+register support for any other data type.
+See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-typeconversion[webflux-ann-typeconversion] and xref:webflux:webflux-controller:webflux-ann-initbinder.adoc#webflux-ann-initbinder[webflux-ann-initbinder].
+
+URI variables can be named explicitly (for example, `@PathVariable("customId")`), but you can
+leave that detail out if the names are the same and you compile your code with debugging
+information or with the `-parameters` compiler flag on Java 8.
+
+The syntax `{*varName}` declares a URI variable that matches zero or more remaining
+path segments. For example `/resources/{*path}` matches all files `/resources/` and the
+`"path"` variable captures the complete relative path.
+
+The syntax `{varName:regex}` declares a URI variable with a regular expression that has the
+syntax: `{varName:regex}`. For example, given a URL of `/spring-web-3.0.5 .jar`, the following method
+extracts the name, version, and file extension:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/{name:[a-z-]+}-{version:\\d\\.\\d\\.\\d}{ext:\\.[a-z]+}")
+	public void handle(@PathVariable String version, @PathVariable String ext) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/{name:[a-z-]+}-{version:\\d\\.\\d\\.\\d}{ext:\\.[a-z]+}")
+	fun handle(@PathVariable version: String, @PathVariable ext: String) {
+		// ...
+	}
+----
+
+URI path patterns can also have embedded `${...}` placeholders that are resolved on startup
+through `PropertyPlaceHolderConfigurer` against local, system, environment, and other property
+sources. You ca use this to, for example, parameterize a base URL based on some external
+configuration.
+
+NOTE: Spring WebFlux uses `PathPattern` and the `PathPatternParser` for URI path matching support.
+Both classes are located in `spring-web` and are expressly designed for use with HTTP URL
+paths in web applications where a large number of URI path patterns are matched at runtime.
+
+Spring WebFlux does not support suffix pattern matching -- unlike Spring MVC, where a
+mapping such as `/person` also matches to `/person.{asterisk}`. For URL-based content
+negotiation, if needed, we recommend using a query parameter, which is simpler, more
+explicit, and less vulnerable to URL path based exploits.
+
+
+[[webflux-ann-requestmapping-pattern-comparison]]
+==== Pattern Comparison
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-pattern-comparison[Web MVC]#
+
+When multiple patterns match a URL, they must be compared to find the best match. This is done
+with `PathPattern.SPECIFICITY_COMPARATOR`, which looks for patterns that are more specific.
+
+For every pattern, a score is computed, based on the number of URI variables and wildcards,
+where a URI variable scores lower than a wildcard. A pattern with a lower total score
+wins. If two patterns have the same score, the longer is chosen.
+
+Catch-all patterns (for example, `**`, `{*varName}`) are excluded from the scoring and are always
+sorted last instead. If two patterns are both catch-all, the longer is chosen.
+
+
+[[webflux-ann-requestmapping-consumes]]
+==== Consumable Media Types
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-consumes[Web MVC]#
+
+You can narrow the request mapping based on the `Content-Type` of the request,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping(path = "/pets", consumes = "application/json")
+	public void addPet(@RequestBody Pet pet) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/pets", consumes = ["application/json"])
+	fun addPet(@RequestBody pet: Pet) {
+		// ...
+	}
+----
+
+The consumes attribute also supports negation expressions -- for example, `!text/plain` means any
+content type other than `text/plain`.
+
+You can declare a shared `consumes` attribute at the class level. Unlike most other request
+mapping attributes, however, when used at the class level, a method-level `consumes` attribute
+overrides rather than extends the class-level declaration.
+
+TIP: `MediaType` provides constants for commonly used media types -- for example,
+`APPLICATION_JSON_VALUE` and `APPLICATION_XML_VALUE`.
+
+
+[[webflux-ann-requestmapping-produces]]
+==== Producible Media Types
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-produces[Web MVC]#
+
+You can narrow the request mapping based on the `Accept` request header and the list of
+content types that a controller method produces, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping(path = "/pets/{petId}", produces = "application/json")
+	@ResponseBody
+	public Pet getPet(@PathVariable String petId) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/pets/{petId}", produces = ["application/json"])
+	@ResponseBody
+	fun getPet(@PathVariable String petId): Pet {
+		// ...
+	}
+----
+
+The media type can specify a character set. Negated expressions are supported -- for example,
+`!text/plain` means any content type other than `text/plain`.
+
+You can declare a shared `produces` attribute at the class level. Unlike most other request
+mapping attributes, however, when used at the class level, a method-level `produces` attribute
+overrides rather than extend the class level declaration.
+
+TIP: `MediaType` provides constants for commonly used media types -- e.g.
+`APPLICATION_JSON_VALUE`, `APPLICATION_XML_VALUE`.
+
+
+[[webflux-ann-requestmapping-params-and-headers]]
+==== Parameters and Headers
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-params-and-headers[Web MVC]#
+
+You can narrow request mappings based on query parameter conditions. You can test for the
+presence of a query parameter (`myParam`), for its absence (`!myParam`), or for a
+specific value (`myParam=myValue`). The following examples tests for a parameter with a value:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping(path = "/pets/{petId}", params = "myParam=myValue") // <1>
+	public void findPet(@PathVariable String petId) {
+		// ...
+	}
+----
+<1> Check that `myParam` equals `myValue`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/pets/{petId}", params = ["myParam=myValue"]) // <1>
+	fun findPet(@PathVariable petId: String) {
+		// ...
+	}
+----
+<1> Check that `myParam` equals `myValue`.
+
+You can also use the same with request header conditions, as the follwing example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping(path = "/pets", headers = "myHeader=myValue") // <1>
+	public void findPet(@PathVariable String petId) {
+		// ...
+	}
+----
+<1> Check that `myHeader` equals `myValue`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/pets", headers = ["myHeader=myValue"]) // <1>
+	fun findPet(@PathVariable petId: String) {
+		// ...
+	}
+----
+<1> Check that `myHeader` equals `myValue`.
+
+
+
+[[webflux-ann-requestmapping-head-options]]
+==== HTTP HEAD, OPTIONS
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-head-options[Web MVC]#
+
+`@GetMapping` and `@RequestMapping(method=HttpMethod.GET)` support HTTP HEAD
+transparently for request mapping purposes. Controller methods need not change.
+A response wrapper, applied in the `HttpHandler` server adapter, ensures a `Content-Length`
+header is set to the number of bytes written without actually writing to the response.
+
+By default, HTTP OPTIONS is handled by setting the `Allow` response header to the list of HTTP
+methods listed in all `@RequestMapping` methods with matching URL patterns.
+
+For a `@RequestMapping` without HTTP method declarations, the `Allow` header is set to
+`GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS`. Controller methods should always declare the
+supported HTTP methods (for example, by using the HTTP method specific variants --
+`@GetMapping`, `@PostMapping`, and others).
+
+You can explicitly map a `@RequestMapping` method to HTTP HEAD and HTTP OPTIONS, but that
+is not necessary in the common case.
+
+
+[[webflux-ann-requestmapping-composed]]
+==== Custom Annotations
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-composed[Web MVC]#
+
+Spring WebFlux supports the use of xref:beans:beans-classpath-scanning:beans-meta-annotations.adoc#beans-meta-annotations[composed annotations]
+for request mapping. Those are annotations that are themselves meta-annotated with
+`@RequestMapping` and composed to redeclare a subset (or all) of the `@RequestMapping`
+attributes with a narrower, more specific purpose.
+
+`@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, and `@PatchMapping` are
+examples of composed annotations. They are provided, because, arguably, most
+controller methods should be mapped to a specific HTTP method versus using `@RequestMapping`,
+which, by default, matches to all HTTP methods. If you need an example of composed
+annotations, look at how those are declared.
+
+Spring WebFlux also supports custom request mapping attributes with custom request matching
+logic. This is a more advanced option that requires sub-classing
+`RequestMappingHandlerMapping` and overriding the `getCustomMethodCondition` method, where
+you can check the custom attribute and return your own `RequestCondition`.
+
+
+[[webflux-ann-requestmapping-registration]]
+==== Explicit Registrations
+[.small]#xref:mvc:mvc-controller:mvc-ann-requestmapping.adoc#mvc-ann-requestmapping-registration[Web MVC]#
+
+You can programmatically register Handler methods, which can be used for dynamic
+registrations or for advanced cases, such as different instances of the same handler
+under different URLs. The following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Configuration
+	public class MyConfig {
+
+		@Autowired
+		public void setHandlerMapping(RequestMappingHandlerMapping mapping, UserHandler handler) // <1>
+				throws NoSuchMethodException {
+
+			RequestMappingInfo info = RequestMappingInfo
+					.paths("/user/{id}").methods(RequestMethod.GET).build(); // <2>
+
+			Method method = UserHandler.class.getMethod("getUser", Long.class); // <3>
+
+			mapping.registerMapping(info, handler, method); // <4>
+		}
+
+	}
+----
+<1> Inject target handlers and the handler mapping for controllers.
+<2> Prepare the request mapping metadata.
+<3> Get the handler method.
+<4> Add the registration.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class MyConfig {
+
+		@Autowired
+		fun setHandlerMapping(mapping: RequestMappingHandlerMapping, handler: UserHandler) { // <1>
+
+			val info = RequestMappingInfo.paths("/user/{id}").methods(RequestMethod.GET).build() // <2>
+
+			val method = UserHandler::class.java.getMethod("getUser", Long::class.java) // <3>
+
+			mapping.registerMapping(info, handler, method) // <4>
+		}
+	}
+----
+<1> Inject target handlers and the handler mapping for controllers.
+<2> Prepare the request mapping metadata.
+<3> Get the handler method.
+<4> Add the registration.
+
+
+
+[[webflux-ann-methods]]
+=== Handler Methods
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-methods[Web MVC]#
+
+`@RequestMapping` handler methods have a flexible signature and can choose from a range of
+supported controller method arguments and return values.
+
+
+[[webflux-ann-arguments]]
+==== Method Arguments
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-arguments[Web MVC]#
+
+The following table shows the supported controller method arguments.
+
+Reactive types (Reactor, RxJava, xref:webflux-reactive-libraries:webflux-reactive-libraries.adoc#webflux-reactive-libraries[or other]) are
+supported on arguments that require blocking I/O (for example, reading the request body) to
+be resolved. This is marked in the Description column. Reactive types are not expected
+on arguments that do not require blocking.
+
+JDK 1.8's `java.util.Optional` is supported as a method argument in combination with
+annotations that have a `required` attribute (for example, `@RequestParam`, `@RequestHeader`,
+and others) and is equivalent to `required=false`.
+
+[cols="1,2", options="header"]
+|===
+| Controller method argument | Description
+
+| `ServerWebExchange`
+| Access to the full `ServerWebExchange` -- container for the HTTP request and response,
+  request and session attributes, `checkNotModified` methods, and others.
+
+| `ServerHttpRequest`, `ServerHttpResponse`
+| Access to the HTTP request or response.
+
+| `WebSession`
+| Access to the session. This does not force the start of a new session unless attributes
+  are added. Supports reactive types.
+
+| `java.security.Principal`
+| The currently authenticated user -- possibly a specific `Principal` implementation class if known.
+  Supports reactive types.
+
+| `org.springframework.http.HttpMethod`
+| The HTTP method of the request.
+
+| `java.util.Locale`
+| The current request locale, determined by the most specific `LocaleResolver` available -- in
+  effect, the configured `LocaleResolver`/`LocaleContextResolver`.
+
+| `java.util.TimeZone` + `java.time.ZoneId`
+| The time zone associated with the current request, as determined by a `LocaleContextResolver`.
+
+| `@PathVariable`
+| For access to URI template variables. See xref:webflux:webflux-controller:webflux-ann-requestmapping.adoc#webflux-ann-requestmapping-uri-templates[webflux-ann-requestmapping-uri-templates].
+
+| `@MatrixVariable`
+| For access to name-value pairs in URI path segments. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-matrix-variables[webflux-ann-matrix-variables].
+
+| `@RequestParam`
+| For access to Servlet request parameters. Parameter values are converted to the declared
+  method argument type. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-requestparam[webflux-ann-requestparam].
+
+  Note that use of `@RequestParam` is optional -- for example, to set its attributes.
+  See "`Any other argument`" later in this table.
+
+| `@RequestHeader`
+| For access to request headers. Header values are converted to the declared method argument
+  type. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-requestheader[webflux-ann-requestheader].
+
+| `@CookieValue`
+| For access to cookies. Cookie values are converted to the declared method argument type.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-cookievalue[webflux-ann-cookievalue].
+
+| `@RequestBody`
+| For access to the HTTP request body. Body content is converted to the declared method
+  argument type by using `HttpMessageReader` instances. Supports reactive types.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-requestbody[webflux-ann-requestbody].
+
+| `HttpEntity<B>`
+| For access to request headers and body. The body is converted with `HttpMessageReader` instances.
+  Supports reactive types. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-httpentity[webflux-ann-httpentity].
+
+| `@RequestPart`
+| For access to a part in  a `multipart/form-data` request. Supports reactive types.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-multipart-forms[webflux-multipart-forms] and xref:webflux:webflux-reactive-spring-web:webflux-web-handler-api.adoc#webflux-multipart[webflux-multipart].
+
+| `java.util.Map`, `org.springframework.ui.Model`, and `org.springframework.ui.ModelMap`.
+| For access to the model that is used in HTML controllers and is exposed to templates as
+  part of view rendering.
+
+| `@ModelAttribute`
+| For access to an existing attribute in the model (instantiated if not present) with
+  data binding and validation applied. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-modelattrib-method-args[webflux-ann-modelattrib-method-args] as well
+  as xref:webflux:webflux-controller:webflux-ann-modelattrib-methods.adoc#webflux-ann-modelattrib-methods[webflux-ann-modelattrib-methods] and xref:webflux:webflux-controller:webflux-ann-initbinder.adoc#webflux-ann-initbinder[webflux-ann-initbinder].
+
+  Note that use of `@ModelAttribute` is optional -- for example, to set its attributes.
+  See "`Any other argument`" later in this table.
+
+| `Errors`, `BindingResult`
+| For access to errors from validation and data binding for a command object
+  (that is, a `@ModelAttribute` argument) or errors from the validation of a `@RequestBody` or
+  `@RequestPart` argument. An `Errors`, or `BindingResult` argument must be declared
+  immediately after the validated method argument.
+
+| `SessionStatus` + class-level `@SessionAttributes`
+| For marking form processing complete, which triggers cleanup of session attributes
+  declared through a class-level `@SessionAttributes` annotation.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-sessionattributes[webflux-ann-sessionattributes] for more details.
+
+| `UriComponentsBuilder`
+| For preparing a URL relative to the current request's host, port, scheme, and path.
+  See xref:webflux:webflux-uri-building.adoc#webflux-uri-building[webflux-uri-building].
+
+| `@SessionAttribute`
+| For access to any session attribute -- in contrast to model attributes stored in the session
+  as a result of a class-level `@SessionAttributes` declaration. See
+  xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-sessionattribute[webflux-ann-sessionattribute] for more details.
+
+| `@RequestAttribute`
+| For access to request attributes. See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-requestattrib[webflux-ann-requestattrib] for more details.
+
+| Any other argument
+| If a method argument is not matched to any of the above, it is, by default, resolved as
+  a `@RequestParam` if it is a simple type, as determined by
+  {api-spring-framework}/beans/BeanUtils.html#isSimpleProperty-java.lang.Class-[BeanUtils#isSimpleProperty],
+  or as a `@ModelAttribute`, otherwise.
+|===
+
+
+[[webflux-ann-return-types]]
+==== Return Values
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-return-types[Web MVC]#
+
+The following table shows the supported controller method return values. Note that reactive
+types from libraries such as Reactor, RxJava, xref:webflux-reactive-libraries:webflux-reactive-libraries.adoc#webflux-reactive-libraries[or other] are
+generally supported for all return values.
+
+[cols="1,2", options="header"]
+|===
+| Controller method return value | Description
+
+| `@ResponseBody`
+| The return value is encoded through `HttpMessageWriter` instances and written to the response.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-responsebody[webflux-ann-responsebody].
+
+| `HttpEntity<B>`, `ResponseEntity<B>`
+| The return value specifies the full response, including HTTP headers, and the body is encoded
+  through `HttpMessageWriter` instances and written to the response.
+  See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-responseentity[webflux-ann-responseentity].
+
+| `HttpHeaders`
+| For returning a response with headers and no body.
+
+| `String`
+| A view name to be resolved with `ViewResolver` instances and used together with the implicit
+  model -- determined through command objects and `@ModelAttribute` methods. The handler
+  method can also programmatically enrich the model by declaring a `Model` argument
+  (described xref:webflux:webflux-dispatcher-handler:webflux-viewresolution.adoc#webflux-viewresolution-handling[earlier]).
+
+| `View`
+| A `View` instance to use for rendering together with the implicit model -- determined
+  through command objects and `@ModelAttribute` methods. The handler method can also
+  programmatically enrich the model by declaring a `Model` argument
+  (described xref:webflux:webflux-dispatcher-handler:webflux-viewresolution.adoc#webflux-viewresolution-handling[earlier]).
+
+| `java.util.Map`, `org.springframework.ui.Model`
+| Attributes to be added to the implicit model, with the view name implicitly determined
+  based on the request path.
+
+| `@ModelAttribute`
+| An attribute to be added to the model, with the view name implicitly determined based
+  on the request path.
+
+  Note that `@ModelAttribute` is optional. See "`Any other return value`" later in
+  this table.
+
+| `Rendering`
+| An API for model and view rendering scenarios.
+
+| `void`
+| A method with a `void`, possibly asynchronous (for example, `Mono<Void>`), return type (or a `null` return
+  value) is considered to have fully handled the response if it also has a `ServerHttpResponse`,
+  a `ServerWebExchange` argument, or an `@ResponseStatus` annotation. The same is also true
+  if the controller has made a positive ETag or `lastModified` timestamp check.
+  // TODO: See xref:webflux:webflux-caching:webflux-caching-etag-lastmodified.adoc#webflux-caching-etag-lastmodified[webflux-caching-etag-lastmodified] for details.
+
+  If none of the above is true, a `void` return type can also indicate "`no response body`" for
+  REST controllers or default view name selection for HTML controllers.
+
+| `Flux<ServerSentEvent>`, `Observable<ServerSentEvent>`, or other reactive type
+| Emit server-sent events. The `ServerSentEvent` wrapper can be omitted when only data needs
+  to be written (however, `text/event-stream` must be requested or declared in the mapping
+  through the `produces` attribute).
+
+| Any other return value
+| If a return value is not matched to any of the above, it is, by default, treated as a view
+  name, if it is `String` or `void` (default view name selection applies), or as a model
+  attribute to be added to the model, unless it is a simple type, as determined by
+  {api-spring-framework}/beans/BeanUtils.html#isSimpleProperty-java.lang.Class-[BeanUtils#isSimpleProperty],
+  in which case it remains unresolved.
+|===
+
+
+[[webflux-ann-typeconversion]]
+==== Type Conversion
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-typeconversion[Web MVC]#
+
+Some annotated controller method arguments that represent String-based request input (for example,
+`@RequestParam`, `@RequestHeader`, `@PathVariable`, `@MatrixVariable`, and `@CookieValue`)
+can require type conversion if the argument is declared as something other than `String`.
+
+For such cases, type conversion is automatically applied based on the configured converters.
+By default, simple types (such as `int`, `long`, `Date`, and others) are supported. Type conversion
+can be customized through a `WebDataBinder` (see xref:mvc:mvc-controller:mvc-ann-initbinder.adoc#mvc-ann-initbinder[mvc-ann-initbinder]) or by registering
+`Formatters` with the `FormattingConversionService` (see xref:validation:format.adoc#format[Spring Field Formatting]).
+
+
+[[webflux-ann-matrix-variables]]
+==== Matrix Variables
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-matrix-variables[Web MVC]#
+
+https://tools.ietf.org/html/rfc3986#section-3.3[RFC 3986] discusses name-value pairs in
+path segments. In Spring WebFlux, we refer to those as "`matrix variables`" based on an
+https://www.w3.org/DesignIssues/MatrixURIs.html["`old post`"] by Tim Berners-Lee, but they
+can be also be referred to as URI path parameters.
+
+Matrix variables can appear in any path segment, with each variable separated by a semicolon and
+multiple values separated by commas -- for example, `"/cars;color=red,green;year=2012"`. Multiple
+values can also be specified through repeated variable names -- for example,
+`"color=red;color=green;color=blue"`.
+
+Unlike Spring MVC, in WebFlux, the presence or absence of matrix variables in a URL does
+not affect request mappings. In other words, you are not required to use a URI variable
+to mask variable content. That said, if you want to access matrix variables from a
+controller method, you need to add a URI variable to the path segment where matrix
+variables are expected. The following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// GET /pets/42;q=11;r=22
+
+	@GetMapping("/pets/{petId}")
+	public void findPet(@PathVariable String petId, @MatrixVariable int q) {
+
+		// petId == 42
+		// q == 11
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// GET /pets/42;q=11;r=22
+
+	@GetMapping("/pets/{petId}")
+	fun findPet(@PathVariable petId: String, @MatrixVariable q: Int) {
+
+		// petId == 42
+		// q == 11
+	}
+----
+
+
+Given that all path segments can contain matrix variables, you may sometimes need to
+disambiguate which path variable the matrix variable is expected to be in,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// GET /owners/42;q=11/pets/21;q=22
+
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	public void findPet(
+			@MatrixVariable(name="q", pathVar="ownerId") int q1,
+			@MatrixVariable(name="q", pathVar="petId") int q2) {
+
+		// q1 == 11
+		// q2 == 22
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	fun findPet(
+			@MatrixVariable(name = "q", pathVar = "ownerId") q1: Int,
+			@MatrixVariable(name = "q", pathVar = "petId") q2: Int) {
+
+		// q1 == 11
+		// q2 == 22
+	}
+----
+
+You can define a matrix variable may be defined as optional and specify a default value
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// GET /pets/42
+
+	@GetMapping("/pets/{petId}")
+	public void findPet(@MatrixVariable(required=false, defaultValue="1") int q) {
+
+		// q == 1
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// GET /pets/42
+
+	@GetMapping("/pets/{petId}")
+	fun findPet(@MatrixVariable(required = false, defaultValue = "1") q: Int) {
+
+		// q == 1
+	}
+----
+
+To get all matrix variables, use a `MultiValueMap`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// GET /owners/42;q=11;r=12/pets/21;q=22;s=23
+
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	public void findPet(
+			@MatrixVariable MultiValueMap<String, String> matrixVars,
+			@MatrixVariable(pathVar="petId") MultiValueMap<String, String> petMatrixVars) {
+
+		// matrixVars: ["q" : [11,22], "r" : 12, "s" : 23]
+		// petMatrixVars: ["q" : 22, "s" : 23]
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// GET /owners/42;q=11;r=12/pets/21;q=22;s=23
+
+	@GetMapping("/owners/{ownerId}/pets/{petId}")
+	fun findPet(
+			@MatrixVariable matrixVars: MultiValueMap<String, String>,
+			@MatrixVariable(pathVar="petId") petMatrixVars: MultiValueMap<String, String>) {
+
+		// matrixVars: ["q" : [11,22], "r" : 12, "s" : 23]
+		// petMatrixVars: ["q" : 22, "s" : 23]
+	}
+----
+
+
+[[webflux-ann-requestparam]]
+==== `@RequestParam`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-requestparam[Web MVC]#
+
+You can use the `@RequestParam` annotation to bind query parameters to a method argument in a
+controller. The following code snippet shows the usage:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	@RequestMapping("/pets")
+	public class EditPetForm {
+
+		// ...
+
+		@GetMapping
+		public String setupForm(@RequestParam("petId") int petId, Model model) { <1>
+			Pet pet = this.clinic.loadPet(petId);
+			model.addAttribute("pet", pet);
+			return "petForm";
+		}
+
+		// ...
+	}
+----
+<1> Using `@RequestParam`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.ui.set
+
+	@Controller
+	@RequestMapping("/pets")
+	class EditPetForm {
+
+		// ...
+
+		@GetMapping
+		fun setupForm(@RequestParam("petId") petId: Int, model: Model): String { // <1>
+			val pet = clinic.loadPet(petId)
+			model["pet"] = pet
+			return "petForm"
+		}
+
+		// ...
+	}
+----
+<1> Using `@RequestParam`.
+
+TIP: The Servlet API "`request parameter`" concept conflates query parameters, form
+data, and multiparts into one. However, in WebFlux, each is accessed individually through
+`ServerWebExchange`. While `@RequestParam` binds to query parameters only, you can use
+data binding to apply query parameters, form data, and multiparts to a
+xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-modelattrib-method-args[command object].
+
+Method parameters that use the `@RequestParam` annotation are required by default, but
+you can specify that a method parameter is optional by setting the required flag of a `@RequestParam`
+to `false` or by declaring the argument with a `java.util.Optional`
+wrapper.
+
+Type conversion is applied automatically if the target method parameter type is not
+`String`. See xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-typeconversion[mvc-ann-typeconversion].
+
+When a `@RequestParam` annotation is declared on a `Map<String, String>` or
+`MultiValueMap<String, String>` argument, the map is populated with all query parameters.
+
+Note that use of `@RequestParam` is optional -- for example, to set its attributes. By
+default, any argument that is a simple value type (as determined by
+{api-spring-framework}/beans/BeanUtils.html#isSimpleProperty-java.lang.Class-[BeanUtils#isSimpleProperty])
+and is not resolved by any other argument resolver is treated as if it were annotated
+with `@RequestParam`.
+
+
+[[webflux-ann-requestheader]]
+==== `@RequestHeader`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-requestheader[Web MVC]#
+
+You can use the `@RequestHeader` annotation to bind a request header to a method argument in a
+controller.
+
+The following example shows a request with headers:
+
+[literal]
+[subs="verbatim,quotes"]
+----
+Host                    localhost:8080
+Accept                  text/html,application/xhtml+xml,application/xml;q=0.9
+Accept-Language         fr,en-gb;q=0.7,en;q=0.3
+Accept-Encoding         gzip,deflate
+Accept-Charset          ISO-8859-1,utf-8;q=0.7,*;q=0.7
+Keep-Alive              300
+----
+
+The following example gets the value of the `Accept-Encoding` and `Keep-Alive` headers:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/demo")
+	public void handle(
+			@RequestHeader("Accept-Encoding") String encoding, // <1>
+			@RequestHeader("Keep-Alive") long keepAlive) { // <2>
+		//...
+	}
+----
+<1> Get the value of the `Accept-Encoging` header.
+<2> Get the value of the `Keep-Alive` header.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/demo")
+	fun handle(
+			@RequestHeader("Accept-Encoding") encoding: String, // <1>
+			@RequestHeader("Keep-Alive") keepAlive: Long) { // <2>
+		//...
+	}
+----
+<1> Get the value of the `Accept-Encoging` header.
+<2> Get the value of the `Keep-Alive` header.
+
+Type conversion is applied automatically if the target method parameter type is not
+`String`. See xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-typeconversion[mvc-ann-typeconversion].
+
+When a `@RequestHeader` annotation is used on a `Map<String, String>`,
+`MultiValueMap<String, String>`, or `HttpHeaders` argument, the map is populated
+with all header values.
+
+TIP: Built-in support is available for converting a comma-separated string into an
+array or collection of strings or other types known to the type conversion system. For
+example, a method parameter annotated with `@RequestHeader("Accept")` may be of type
+`String` but also of `String[]` or `List<String>`.
+
+
+[[webflux-ann-cookievalue]]
+==== `@CookieValue`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-cookievalue[Web MVC]#
+
+You can use the `@CookieValue` annotation to bind the value of an HTTP cookie to a method argument
+in a controller.
+
+The following example shows a request with a cookie:
+
+[literal,subs="verbatim,quotes"]
+----
+JSESSIONID=415A4AC178C59DACE0B2C9CA727CDD84
+----
+
+The following code sample demonstrates how to get the cookie value:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/demo")
+	public void handle(@CookieValue("JSESSIONID") String cookie) { // <1>
+		//...
+	}
+----
+<1> Get the cookie value.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/demo")
+	fun handle(@CookieValue("JSESSIONID") cookie: String) { // <1>
+		//...
+	}
+----
+<1> Get the cookie value.
+
+
+Type conversion is applied automatically if the target method parameter type is not
+`String`. See xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-typeconversion[mvc-ann-typeconversion].
+
+
+[[webflux-ann-modelattrib-method-args]]
+==== `@ModelAttribute`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-modelattrib-method-args[Web MVC]#
+
+You can use the `@ModelAttribute` annotation on a method argument to access an attribute from the
+model or have it instantiated if not present. The model attribute is also overlain with
+the values of query parameters and form fields whose names match to field names. This is
+referred to as data binding, and it saves you from having to deal with parsing and
+converting individual query parameters and form fields. The following example binds an instance of `Pet`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	public String processSubmit(@ModelAttribute Pet pet) { } // <1>
+----
+<1> Bind an instance of `Pet`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	fun processSubmit(@ModelAttribute pet: Pet): String { } // <1>
+----
+<1> Bind an instance of `Pet`.
+
+The `Pet` instance in the preceding example is resolved as follows:
+
+* From the model if already added through xref:webflux:webflux-controller:webflux-ann-modelattrib-methods.adoc#webflux-ann-modelattrib-methods[webflux-ann-modelattrib-methods].
+* From the HTTP session through xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-sessionattributes[webflux-ann-sessionattributes].
+* From the invocation of a default constructor.
+* From the invocation of a "`primary constructor`" with arguments that match query
+parameters or form fields. Argument names are determined through JavaBeans
+`@ConstructorProperties` or through runtime-retained parameter names in the bytecode.
+
+After the model attribute instance is obtained, data binding is applied. The
+`WebExchangeDataBinder` class matches names of query parameters and form fields to field
+names on the target `Object`. Matching fields are populated after type conversion is applied
+where necessary. For more on data binding (and validation), see
+xref:validation:validation.adoc#validation[Validation]. For more on customizing data binding, see
+xref:webflux:webflux-controller:webflux-ann-initbinder.adoc#webflux-ann-initbinder[webflux-ann-initbinder].
+
+Data binding can result in errors. By default, a `WebExchangeBindException` is raised, but,
+to check for such errors in the controller method, you can add a `BindingResult` argument
+immediately next to the `@ModelAttribute`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	public String processSubmit(@ModelAttribute("pet") Pet pet, BindingResult result) { <1>
+		if (result.hasErrors()) {
+			return "petForm";
+		}
+		// ...
+	}
+----
+<1> Adding a `BindingResult`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	fun processSubmit(@ModelAttribute("pet") pet: Pet, result: BindingResult): String { // <1>
+		if (result.hasErrors()) {
+			return "petForm"
+		}
+		// ...
+	}
+----
+<1> Adding a `BindingResult`.
+
+You can automatically apply validation after data binding by adding the
+`javax.validation.Valid` annotation or Spring's `@Validated` annotation (see also
+xref:validation:validation-beanvalidation.adoc#validation-beanvalidation[Bean Validation] and
+xref:validation:validation.adoc#validation[Spring validation]). The following example uses the `@Valid` annotation:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	public String processSubmit(@Valid @ModelAttribute("pet") Pet pet, BindingResult result) { // <1>
+		if (result.hasErrors()) {
+			return "petForm";
+		}
+		// ...
+	}
+----
+<1> Using `@Valid` on a model attribute argument.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	fun processSubmit(@Valid @ModelAttribute("pet") pet: Pet, result: BindingResult): String { // <1>
+		if (result.hasErrors()) {
+			return "petForm"
+		}
+		// ...
+	}
+----
+<1> Using `@Valid` on a model attribute argument.
+
+Spring WebFlux, unlike Spring MVC, supports reactive types in the model -- for example,
+`Mono<Account>` or `io.reactivex.Single<Account>`. You can declare a `@ModelAttribute` argument
+with or without a reactive type wrapper, and it will be resolved accordingly,
+to the actual value if necessary. However, note that, to use a `BindingResult`
+argument, you must declare the `@ModelAttribute` argument before it without a reactive
+type wrapper, as shown earlier. Alternatively, you can handle any errors through the
+reactive type, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	public Mono<String> processSubmit(@Valid @ModelAttribute("pet") Mono<Pet> petMono) {
+		return petMono
+			.flatMap(pet -> {
+				// ...
+			})
+			.onErrorResume(ex -> {
+				// ...
+			});
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/owners/{ownerId}/pets/{petId}/edit")
+	fun processSubmit(@Valid @ModelAttribute("pet") petMono: Mono<Pet>): Mono<String> {
+		return petMono
+				.flatMap { pet ->
+					// ...
+				}
+				.onErrorResume{ ex ->
+					// ...
+				}
+	}
+----
+
+Note that use of `@ModelAttribute` is optional -- for example, to set its attributes.
+By default, any argument that is not a simple value type( as determined by
+{api-spring-framework}/beans/BeanUtils.html#isSimpleProperty-java.lang.Class-[BeanUtils#isSimpleProperty])
+and is not resolved by any other argument resolver is treated as if it were annotated
+with `@ModelAttribute`.
+
+
+[[webflux-ann-sessionattributes]]
+==== `@SessionAttributes`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-sessionattributes[Web MVC]#
+
+`@SessionAttributes` is used to store model attributes in the `WebSession` between
+requests. It is a type-level annotation that declares session attributes used by a
+specific controller. This typically lists the names of model attributes or types of
+model attributes that should be transparently stored in the session for subsequent
+requests to access.
+
+Consider the following example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	@SessionAttributes("pet") <1>
+	public class EditPetForm {
+		// ...
+	}
+----
+<1> Using the `@SessionAttributes` annotation.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	@SessionAttributes("pet") // <1>
+	class EditPetForm {
+		// ...
+	}
+----
+<1> Using the `@SessionAttributes` annotation.
+
+On the first request, when a model attribute with the name, `pet`, is added to the model,
+it is automatically promoted to and saved in the `WebSession`. It remains there until
+another controller method uses a `SessionStatus` method argument to clear the storage,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	@SessionAttributes("pet") // <1>
+	public class EditPetForm {
+
+		// ...
+
+		@PostMapping("/pets/{id}")
+		public String handle(Pet pet, BindingResult errors, SessionStatus status) { // <2>
+			if (errors.hasErrors()) {
+				// ...
+			}
+				status.setComplete();
+				// ...
+			}
+		}
+	}
+----
+<1> Using the `@SessionAttributes` annotation.
+<2> Using a `SessionStatus` variable.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	@SessionAttributes("pet") // <1>
+	class EditPetForm {
+
+		// ...
+
+		@PostMapping("/pets/{id}")
+		fun handle(pet: Pet, errors: BindingResult, status: SessionStatus): String { // <2>
+			if (errors.hasErrors()) {
+				// ...
+			}
+			status.setComplete()
+			// ...
+		}
+	}
+----
+<1> Using the `@SessionAttributes` annotation.
+<2> Using a `SessionStatus` variable.
+
+
+[[webflux-ann-sessionattribute]]
+==== `@SessionAttribute`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-sessionattribute[Web MVC]#
+
+If you need access to pre-existing session attributes that are managed globally
+(that is, outside the controller -- for example, by a filter) and may or may not be present,
+you can use the `@SessionAttribute` annotation on a method parameter, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/")
+	public String handle(@SessionAttribute User user) { // <1>
+		// ...
+	}
+----
+<1> Using `@SessionAttribute`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/")
+	fun handle(@SessionAttribute user: User): String { // <1>
+		// ...
+	}
+----
+<1> Using `@SessionAttribute`.
+
+For use cases that require adding or removing session attributes, consider injecting
+`WebSession` into the controller method.
+
+For temporary storage of model attributes in the session as part of a controller
+workflow, consider using `SessionAttributes`, as described in
+xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-sessionattributes[webflux-ann-sessionattributes].
+
+
+[[webflux-ann-requestattrib]]
+==== `@RequestAttribute`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-requestattrib[Web MVC]#
+
+Similarly to `@SessionAttribute`, you can use the `@RequestAttribute` annotation to
+access pre-existing request attributes created earlier (for example, by a `WebFilter`),
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/")
+	public String handle(@RequestAttribute Client client) { <1>
+		// ...
+	}
+----
+<1> Using `@RequestAttribute`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/")
+	fun handle(@RequestAttribute client: Client): String { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestAttribute`.
+
+
+[[webflux-multipart-forms]]
+==== Multipart Content
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-multipart-forms[Web MVC]#
+
+As explained in xref:webflux:webflux-reactive-spring-web:webflux-web-handler-api.adoc#webflux-multipart[webflux-multipart], `ServerWebExchange` provides access to multipart
+content. The best way to handle a file upload form (for example, from a browser) in a controller
+is through data binding to a xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-modelattrib-method-args[command object],
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	class MyForm {
+
+		private String name;
+
+		private MultipartFile file;
+
+		// ...
+
+	}
+
+	@Controller
+	public class FileUploadController {
+
+		@PostMapping("/form")
+		public String handleFormUpload(MyForm form, BindingResult errors) {
+			// ...
+		}
+
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MyForm(
+			val name: String,
+			val file: MultipartFile)
+
+	@Controller
+	class FileUploadController {
+
+		@PostMapping("/form")
+		fun handleFormUpload(form: MyForm, errors: BindingResult): String {
+			// ...
+		}
+
+	}
+----
+
+You can also submit multipart requests from non-browser clients in a RESTful service
+scenario. The following example uses a file along with JSON:
+
+[literal,subs="verbatim,quotes"]
+----
+POST /someUrl
+Content-Type: multipart/mixed
+
+--edt7Tfrdusa7r3lNQc79vXuhIIMlatb7PQg7Vp
+Content-Disposition: form-data; name="meta-data"
+Content-Type: application/json; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+{
+	"name": "value"
+}
+--edt7Tfrdusa7r3lNQc79vXuhIIMlatb7PQg7Vp
+Content-Disposition: form-data; name="file-data"; filename="file.properties"
+Content-Type: text/xml
+Content-Transfer-Encoding: 8bit
+... File Data ...
+----
+
+You can access individual parts with `@RequestPart`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/")
+	public String handle(@RequestPart("meta-data") Part metadata, // <1>
+			@RequestPart("file-data") FilePart file) { // <2>
+		// ...
+	}
+----
+<1> Using `@RequestPart` to get the metadata.
+<2> Using `@RequestPart` to get the file.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/")
+	fun handle(@RequestPart("meta-data") Part metadata, // <1>
+			@RequestPart("file-data") FilePart file): String { // <2>
+		// ...
+	}
+----
+<1> Using `@RequestPart` to get the metadata.
+<2> Using `@RequestPart` to get the file.
+
+
+To deserialize the raw part content (for example, to JSON -- similar to `@RequestBody`),
+you can declare a concrete target `Object`, instead of `Part`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/")
+	public String handle(@RequestPart("meta-data") MetaData metadata) { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestPart` to get the metadata.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/")
+	fun handle(@RequestPart("meta-data") metadata: MetaData): String { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestPart` to get the metadata.
+
+You can use `@RequestPart` combination with `javax.validation.Valid` or Spring's
+`@Validated` annotation, which causes Standard Bean Validation to be applied.
+By default, validation errors cause a `WebExchangeBindException`, which is turned
+into a 400 (`BAD_REQUEST`) response. Alternatively, you can handle validation errors locally
+within the controller through an `Errors` or `BindingResult` argument, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/")
+	public String handle(@Valid @RequestPart("meta-data") MetaData metadata, // <1>
+			BindingResult result) { <2>
+		// ...
+	}
+----
+<1> Using a `@Valid` annotation.
+<2> Using a `BindingResult` argument.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/")
+	fun handle(@Valid @RequestPart("meta-data") metadata: MetaData, // <1> 
+			result: BindingResult): String { // <2>
+		// ...
+	}
+----
+<1> Using a `@Valid` annotation.
+<2> Using a `BindingResult` argument.
+
+To access all multipart data as a `MultiValueMap`, you can use `@RequestBody`,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/")
+	public String handle(@RequestBody Mono<MultiValueMap<String, Part>> parts) { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestBody`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/")
+	fun handle(@RequestBody parts: MultiValueMap<String, Part>): String { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestBody`.
+
+
+To access multipart data sequentially, in streaming fashion, you can use `@RequestBody` with
+`Flux<Part>` (or `Flow<Part>` in Kotlin) instead, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/")
+	public String handle(@RequestBody Flux<Part> parts) { <1>
+		// ...
+	}
+----
+<1> Using `@RequestBody`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/")
+	fun handle(@RequestBody parts: Flow<Part>): String { // <1>
+		// ...
+	}
+----
+<1> Using `@RequestBody`.
+
+
+[[webflux-ann-requestbody]]
+==== `@RequestBody`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-requestbody[Web MVC]#
+
+You can use the `@RequestBody` annotation to have the request body read and deserialized into an
+`Object` through an xref:webflux:webflux-reactive-spring-web:webflux-codecs.adoc#webflux-codecs[HttpMessageReader].
+The following example uses a `@RequestBody` argument:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/accounts")
+	public void handle(@RequestBody Account account) {
+		// ...
+	}
+----
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/accounts")
+	fun handle(@RequestBody account: Account) {
+		// ...
+	}
+----
+
+Unlike Spring MVC, in WebFlux, the `@RequestBody` method argument supports reactive types
+and fully non-blocking reading and (client-to-server) streaming.
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/accounts")
+	public void handle(@RequestBody Mono<Account> account) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/accounts")
+	fun handle(@RequestBody accounts: Flow<Account>) {
+		// ...
+	}
+----
+
+You can use the xref:webflux:webflux-config:webflux-config-message-codecs.adoc#webflux-config-message-codecs[webflux-config-message-codecs] option of the xref:webflux:webflux-config.adoc#webflux-config[webflux-config] to
+configure or customize message readers.
+
+You can use `@RequestBody` in combination with `javax.validation.Valid` or Spring's
+`@Validated` annotation, which causes Standard Bean Validation to be applied.
+By default, validation errors cause a `WebExchangeBindException`, which is turned
+into a 400 (`BAD_REQUEST`) response. Alternatively, you can handle validation errors locally
+within the controller through an `Errors` or a `BindingResult` argument. The following
+example uses a `BindingResult` argument`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/accounts")
+	public void handle(@Valid @RequestBody Account account, BindingResult result) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/accounts")
+	fun handle(@Valid @RequestBody account: Account, result: BindingResult) {
+		// ...
+	}
+----
+
+
+[[webflux-ann-httpentity]]
+==== `HttpEntity`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-httpentity[Web MVC]#
+
+`HttpEntity` is more or less identical to using xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-requestbody[webflux-ann-requestbody] but is based on a
+container object that exposes request headers and the body. The following example uses an
+`HttpEntity`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@PostMapping("/accounts")
+	public void handle(HttpEntity<Account> entity) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@PostMapping("/accounts")
+	fun handle(entity: HttpEntity<Account>) {
+		// ...
+	}
+----
+
+
+[[webflux-ann-responsebody]]
+==== `@ResponseBody`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-responsebody[Web MVC]#
+
+You can use the `@ResponseBody` annotation on a method to have the return serialized
+to the response body through an xref:webflux:webflux-reactive-spring-web:webflux-codecs.adoc#webflux-codecs[HttpMessageWriter]. The following
+example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/accounts/{id}")
+	@ResponseBody
+	public Account handle() {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/accounts/{id}")
+	@ResponseBody
+	fun handle(): Account {
+		// ...
+	}
+----
+
+`@ResponseBody` is also supported at the class level, in which case it is inherited by
+all controller methods. This is the effect of `@RestController`, which is nothing more
+than a meta-annotation marked with `@Controller` and `@ResponseBody`.
+
+`@ResponseBody` supports reactive types, which means you can return Reactor or RxJava
+types and have the asynchronous values they produce rendered to the response.
+For additional details, see xref:webflux:webflux-reactive-spring-web:webflux-codecs.adoc#webflux-codecs-streaming[webflux-codecs-streaming] and
+xref:webflux:webflux-reactive-spring-web:webflux-codecs.adoc#webflux-codecs-jackson[JSON rendering].
+
+You can combine `@ResponseBody` methods with JSON serialization views.
+See xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-jackson[webflux-ann-jackson] for details.
+
+You can use the xref:webflux:webflux-config:webflux-config-message-codecs.adoc#webflux-config-message-codecs[webflux-config-message-codecs] option of the xref:webflux:webflux-config.adoc#webflux-config[webflux-config] to
+configure or customize message writing.
+
+
+[[webflux-ann-responseentity]]
+==== `ResponseEntity`
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-responseentity[Web MVC]#
+
+`ResponseEntity` is like xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-responsebody[webflux-ann-responsebody] but with status and headers. For example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/something")
+	public ResponseEntity<String> handle() {
+		String body = ... ;
+		String etag = ... ;
+		return ResponseEntity.ok().eTag(etag).build(body);
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/something")
+	fun handle(): ResponseEntity<String> {
+		val body: String = ...
+		val etag: String = ...
+		return ResponseEntity.ok().eTag(etag).build(body)
+	}
+----
+
+WebFlux supports using a single value xref:webflux-reactive-libraries:webflux-reactive-libraries.adoc#webflux-reactive-libraries[reactive type] to
+produce the `ResponseEntity` asynchronously, and/or single and multi-value reactive types
+for the body.
+
+
+[[webflux-ann-jackson]]
+==== Jackson JSON
+
+Spring offers support for the Jackson JSON library.
+
+[[webflux-ann-jsonview]]
+===== JSON Views
+[.small]#xref:mvc:mvc-controller:mvc-ann-methods.adoc#mvc-ann-jackson[Web MVC]#
+
+Spring WebFlux provides built-in support for
+https://www.baeldung.com/jackson-json-view-annotation[Jackson's Serialization Views],
+which allows rendering only a subset of all fields in an `Object`. To use it with
+`@ResponseBody` or `ResponseEntity` controller methods, you can use Jackson's
+`@JsonView` annotation to activate a serialization view class, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@RestController
+	public class UserController {
+
+		@GetMapping("/user")
+		@JsonView(User.WithoutPasswordView.class)
+		public User getUser() {
+			return new User("eric", "7!jd#h23");
+		}
+	}
+
+	public class User {
+
+		public interface WithoutPasswordView {};
+		public interface WithPasswordView extends WithoutPasswordView {};
+
+		private String username;
+		private String password;
+
+		public User() {
+		}
+
+		public User(String username, String password) {
+			this.username = username;
+			this.password = password;
+		}
+
+		@JsonView(WithoutPasswordView.class)
+		public String getUsername() {
+			return this.username;
+		}
+
+		@JsonView(WithPasswordView.class)
+		public String getPassword() {
+			return this.password;
+		}
+	}
+----
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@RestController
+	class UserController {
+
+		@GetMapping("/user")
+		@JsonView(User.WithoutPasswordView::class)
+		fun getUser(): User {
+			return User("eric", "7!jd#h23")
+		}
+	}
+
+	class User(
+			@JsonView(WithoutPasswordView::class) val username: String,
+			@JsonView(WithPasswordView::class) val password: String
+	) {
+		interface WithoutPasswordView
+		interface WithPasswordView : WithoutPasswordView
+	}
+----
+
+NOTE: `@JsonView` allows an array of view classes but you can only specify only one per
+controller method. Use a composite interface if you need to activate multiple views.
+
+
+
+[[webflux-ann-modelattrib-methods]]
+=== `Model`
+[.small]#xref:mvc:mvc-controller:mvc-ann-modelattrib-methods.adoc#mvc-ann-modelattrib-methods[Web MVC]#
+
+You can use the `@ModelAttribute` annotation:
+
+* On a xref:webflux:webflux-controller:webflux-ann-methods.adoc#webflux-ann-modelattrib-method-args[method argument] in `@RequestMapping` methods
+to create or access an Object from the model and to bind it to the request through a
+`WebDataBinder`.
+* As a method-level annotation in `@Controller` or `@ControllerAdvice` classes, helping
+to initialize the model prior to any `@RequestMapping` method invocation.
+* On a `@RequestMapping` method to mark its return value as a model attribute.
+
+This section discusses `@ModelAttribute` methods, or the second item from the preceding list.
+A controller can have any number of `@ModelAttribute` methods. All such methods are
+invoked before `@RequestMapping` methods in the same controller. A `@ModelAttribute`
+method can also be shared across controllers through `@ControllerAdvice`. See the section on
+xref:webflux:webflux-controller:webflux-ann-controller-advice.adoc#webflux-ann-controller-advice[webflux-ann-controller-advice] for more details.
+
+`@ModelAttribute` methods have flexible method signatures. They support many of the same
+arguments as `@RequestMapping` methods (except for `@ModelAttribute` itself and anything
+related to the request body).
+
+The following example uses a `@ModelAttribute` method:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@ModelAttribute
+	public void populateModel(@RequestParam String number, Model model) {
+		model.addAttribute(accountRepository.findAccount(number));
+		// add more ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@ModelAttribute
+	fun populateModel(@RequestParam number: String, model: Model) {
+		model.addAttribute(accountRepository.findAccount(number))
+		// add more ...
+	}
+----
+
+The following example adds one attribute only:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@ModelAttribute
+	public Account addAccount(@RequestParam String number) {
+		return accountRepository.findAccount(number);
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@ModelAttribute
+	fun addAccount(@RequestParam number: String): Account {
+		return accountRepository.findAccount(number);
+	}
+----
+
+NOTE: When a name is not explicitly specified, a default name is chosen based on the type,
+as explained in the javadoc for {api-spring-framework}/core/Conventions.html[`Conventions`].
+You can always assign an explicit name by using the overloaded `addAttribute` method or
+through the name attribute on `@ModelAttribute` (for a return value).
+
+Spring WebFlux, unlike Spring MVC, explicitly supports reactive types in the model
+(for example, `Mono<Account>` or `io.reactivex.Single<Account>`). Such asynchronous model
+attributes can be transparently resolved (and the model updated) to their actual values
+at the time of `@RequestMapping` invocation, provided a `@ModelAttribute` argument is
+declared without a wrapper, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@ModelAttribute
+	public void addAccount(@RequestParam String number) {
+	    Mono<Account> accountMono = accountRepository.findAccount(number);
+	    model.addAttribute("account", accountMono);
+	}
+
+	@PostMapping("/accounts")
+	public String handle(@ModelAttribute Account account, BindingResult errors) {
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.ui.set
+
+	@ModelAttribute
+	fun addAccount(@RequestParam number: String) {
+		val accountMono: Mono<Account> = accountRepository.findAccount(number)
+		model["account"] = accountMono
+	}
+
+	@PostMapping("/accounts")
+	fun handle(@ModelAttribute account: Account, errors: BindingResult): String {
+		// ...
+	}
+----
+
+
+In addition, any model attributes that have a reactive type wrapper are resolved to their
+actual values (and the model updated) just prior to view rendering.
+
+You can also use `@ModelAttribute` as a method-level annotation on `@RequestMapping`
+methods, in which case the return value of the `@RequestMapping` method is interpreted as a
+model attribute. This is typically not required, as it is the default behavior in HTML
+controllers, unless the return value is a `String` that would otherwise be interpreted
+as a view name. `@ModelAttribute` can also help to customize the model attribute name,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@GetMapping("/accounts/{id}")
+	@ModelAttribute("myAccount")
+	public Account handle() {
+		// ...
+		return account;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@GetMapping("/accounts/{id}")
+	@ModelAttribute("myAccount")
+	fun handle(): Account {
+		// ...
+		return account
+	}
+----
+
+
+
+[[webflux-ann-initbinder]]
+=== `DataBinder`
+[.small]#xref:mvc:mvc-controller:mvc-ann-initbinder.adoc#mvc-ann-initbinder[Web MVC]#
+
+`@Controller` or `@ControllerAdvice` classes can have `@InitBinder` methods, to
+initialize instances of `WebDataBinder`. Those, in turn, are used to:
+
+* Bind request parameters (that is, form data or query) to a model object.
+* Convert `String`-based request values (such as request parameters, path variables,
+headers, cookies, and others) to the target type of controller method arguments.
+* Format model object values as `String` values when rendering HTML forms.
+
+`@InitBinder` methods can register controller-specific `java.bean.PropertyEditor` or
+Spring `Converter` and `Formatter` components. In addition, you can use the
+xref:webflux:webflux-config:webflux-config-conversion.adoc#webflux-config-conversion[WebFlux Java configuration] to register `Converter` and
+`Formatter` types in a globally shared `FormattingConversionService`.
+
+`@InitBinder` methods support many of the same arguments that `@RequestMapping` methods
+do, except for `@ModelAttribute` (command object) arguments. Typically, they are declared
+with a `WebDataBinder` argument, for registrations, and a `void` return value.
+The following example uses the `@InitBinder` annotation:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	public class FormController {
+
+		@InitBinder // <1>
+		public void initBinder(WebDataBinder binder) {
+			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+			dateFormat.setLenient(false);
+			binder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, false));
+		}
+
+		// ...
+	}
+----
+<1> Using the `@InitBinder` annotation.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	class FormController {
+
+		@InitBinder // <1>
+		fun initBinder(binder: WebDataBinder) {
+			val dateFormat = SimpleDateFormat("yyyy-MM-dd")
+			dateFormat.isLenient = false
+			binder.registerCustomEditor(Date::class.java, CustomDateEditor(dateFormat, false))
+		}
+
+		// ...
+	}
+----
+
+Alternatively, when using a `Formatter`-based setup through a shared
+`FormattingConversionService`, you could re-use the same approach and register
+controller-specific `Formatter` instances, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	public class FormController {
+
+		@InitBinder
+		protected void initBinder(WebDataBinder binder) {
+			binder.addCustomFormatter(new DateFormatter("yyyy-MM-dd")); <1>
+		}
+
+		// ...
+	}
+----
+<1> Adding a custom formatter (a `DateFormatter`, in this case).
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	class FormController {
+
+		@InitBinder
+		fun initBinder(binder: WebDataBinder) {
+			binder.addCustomFormatter(DateFormatter("yyyy-MM-dd")) // <1>
+		}
+
+		// ...
+	}
+----
+<1> Adding a custom formatter (a `DateFormatter`, in this case).
+
+
+
+[[webflux-ann-controller-exceptions]]
+=== Managing Exceptions
+[.small]#xref:mvc:mvc-controller:mvc-ann-exceptionhandler.adoc#mvc-ann-exceptionhandler[Web MVC]#
+
+`@Controller` and xref:mvc:mvc-controller:mvc-ann-controller-advice.adoc#mvc-ann-controller-advice[@ControllerAdvice] classes can have
+`@ExceptionHandler` methods to handle exceptions from controller methods. The following
+example includes such a handler method:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Controller
+	public class SimpleController {
+
+		// ...
+
+		@ExceptionHandler // <1>
+		public ResponseEntity<String> handle(IOException ex) {
+			// ...
+		}
+	}
+----
+<1> Declaring an `@ExceptionHandler`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Controller
+	class SimpleController {
+
+		// ...
+
+		@ExceptionHandler // <1>
+		fun handle(ex: IOException): ResponseEntity<String> {
+			// ...
+		}
+	}
+----
+<1> Declaring an `@ExceptionHandler`.
+
+
+The exception can match against a top-level exception being propagated (that is, a direct
+`IOException` being thrown) or against the immediate cause within a top-level wrapper
+exception (for example, an `IOException` wrapped inside an `IllegalStateException`).
+
+For matching exception types, preferably declare the target exception as a method argument,
+as shown in the preceding example. Alternatively, the annotation declaration can narrow the
+exception types to match. We generally recommend being as specific as possible in the
+argument signature and to declare your primary root exception mappings on a
+`@ControllerAdvice` prioritized with a corresponding order.
+See xref:mvc:mvc-controller:mvc-ann-exceptionhandler.adoc#mvc-ann-exceptionhandler[the MVC section] for details.
+
+NOTE: An `@ExceptionHandler` method in WebFlux supports the same method arguments and
+return values as a `@RequestMapping` method, with the exception of request body-
+and `@ModelAttribute`-related method arguments.
+
+Support for `@ExceptionHandler` methods in Spring WebFlux is provided by the
+`HandlerAdapter` for `@RequestMapping` methods. See xref:webflux:webflux-dispatcher-handler.adoc#webflux-dispatcher-handler[webflux-dispatcher-handler]
+for more detail.
+
+
+[[webflux-ann-rest-exceptions]]
+==== REST API exceptions
+[.small]#xref:mvc:mvc-controller:mvc-ann-exceptionhandler.adoc#mvc-ann-rest-exceptions[Web MVC]#
+
+A common requirement for REST services is to include error details in the body of the
+response. The Spring Framework does not automatically do so, because the representation
+of error details in the response body is application-specific. However, a
+`@RestController` can use `@ExceptionHandler` methods with a `ResponseEntity` return
+value to set the status and the body of the response. Such methods can also be declared
+in `@ControllerAdvice` classes to apply them globally.
+
+NOTE: Note that Spring WebFlux does not have an equivalent for the Spring MVC
+`ResponseEntityExceptionHandler`, because WebFlux raises only `ResponseStatusException`
+(or subclasses thereof), and those do not need to be translated to
+an HTTP status code.
+
+
+
+[[webflux-ann-controller-advice]]
+=== Controller Advice
+[.small]#xref:mvc:mvc-controller:mvc-ann-controller-advice.adoc#mvc-ann-controller-advice[Web MVC]#
+
+Typically, the `@ExceptionHandler`, `@InitBinder`, and `@ModelAttribute` methods apply
+within the `@Controller` class (or class hierarchy) in which they are declared. If you
+want such methods to apply more globally (across controllers), you can declare them in a
+class annotated with `@ControllerAdvice` or `@RestControllerAdvice`.
+
+`@ControllerAdvice` is annotated with `@Component`, which means that such classes can be
+registered as Spring beans through xref:beans:beans-java:beans-java-instantiating-container.adoc#beans-java-instantiating-container-scan[component scanning]. `@RestControllerAdvice` is a composed annotation that is annotated
+with both `@ControllerAdvice` and `@ResponseBody`, which essentially means
+`@ExceptionHandler` methods are rendered to the response body through message conversion
+(versus view resolution or template rendering).
+
+On startup, the infrastructure classes for `@RequestMapping` and `@ExceptionHandler`
+methods detect Spring beans annotated with `@ControllerAdvice` and then apply their
+methods at runtime. Global `@ExceptionHandler` methods (from a `@ControllerAdvice`) are
+applied _after_ local ones (from the `@Controller`). By contrast, global `@ModelAttribute`
+and `@InitBinder` methods are applied _before_ local ones.
+
+By default, `@ControllerAdvice` methods apply to every request (that is, all controllers),
+but you can narrow that down to a subset of controllers by using attributes on the
+annotation, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// Target all Controllers annotated with @RestController
+	@ControllerAdvice(annotations = RestController.class)
+	public class ExampleAdvice1 {}
+
+	// Target all Controllers within specific packages
+	@ControllerAdvice("org.example.controllers")
+	public class ExampleAdvice2 {}
+
+	// Target all Controllers assignable to specific classes
+	@ControllerAdvice(assignableTypes = {ControllerInterface.class, AbstractController.class})
+	public class ExampleAdvice3 {}
+----
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// Target all Controllers annotated with @RestController
+	@ControllerAdvice(annotations = [RestController::class])
+	public class ExampleAdvice1 {}
+
+	// Target all Controllers within specific packages
+	@ControllerAdvice("org.example.controllers")
+	public class ExampleAdvice2 {}
+
+	// Target all Controllers assignable to specific classes
+	@ControllerAdvice(assignableTypes = [ControllerInterface::class, AbstractController::class])
+	public class ExampleAdvice3 {}
+----
+
+The selectors in the preceding example are evaluated at runtime and may negatively impact
+performance if used extensively. See the
+{api-spring-framework}/web/bind/annotation/ControllerAdvice.html[`@ControllerAdvice`]
+javadoc for more details.
+
+
+
+

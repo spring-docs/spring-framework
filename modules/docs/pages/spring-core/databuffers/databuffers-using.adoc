@@ -1,0 +1,71 @@
+include::page$attributes.adoc[]
+[[databuffers-using]]
+== Using `DataBuffer`
+
+When working with data buffers, special care must be taken to ensure buffers are released
+since they may be xref:databuffers:databuffers-buffer-pooled.adoc#databuffers-buffer-pooled[pooled]. We'll use codecs to illustrate
+how that works but the concepts apply more generally. Let's see what codecs must do
+internally to manage data buffers.
+
+A `Decoder` is the last to read input data buffers, before creating higher level
+objects, and therefore it must release them as follows:
+
+. If a `Decoder` simply reads each input buffer and is ready to
+release it immediately, it can do so via `DataBufferUtils.release(dataBuffer)`.
+. If a `Decoder` is using `Flux` or `Mono` operators such as `flatMap`, `reduce`, and
+others that prefetch and cache data items internally, or is using operators such as
+`filter`, `skip`, and others that leave out items, then
+`doOnDiscard(PooledDataBuffer.class, DataBufferUtils::release)` must be added to the
+composition chain to ensure such buffers are released prior to being discarded, possibly
+also as a result an error or cancellation signal.
+. If a `Decoder` holds on to one or more data buffers in any other way, it must
+ensure they are released when fully read, or in case an error or cancellation signals that
+take place before the cached data buffers have been read and released.
+
+Note that `DataBufferUtils#join` offers a safe and efficient way to aggregate a data
+buffer stream into a single data buffer. Likewise `skipUntilByteCount` and
+`takeUntilByteCount` are additional safe methods for decoders to use.
+
+An `Encoder` allocates data buffers that others must read (and release). So an `Encoder`
+doesn't have much to do. However an `Encoder` must take care to release a data buffer if
+a serialization error occurs while populating the buffer with data. For example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	DataBuffer buffer = factory.allocateBuffer();
+	boolean release = true;
+	try {
+		// serialize and populate buffer..
+		release = false;
+	}
+	finally {
+		if (release) {
+			DataBufferUtils.release(buffer);
+		}
+	}
+	return buffer;
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val buffer = factory.allocateBuffer()
+	var release = true
+	try {
+		// serialize and populate buffer..
+		release = false
+	} finally {
+		if (release) {
+			DataBufferUtils.release(buffer)
+		}
+	}
+	return buffer
+----
+
+The consumer of an `Encoder` is responsible for releasing the data buffers it receives.
+In a WebFlux application, the output of the `Encoder` is used to write to the HTTP server
+response, or to the client HTTP request, in which case releasing the data buffers is the
+responsibility of the code writing to the server response, or to the client request.
+
+Note that when running on Netty, there are debugging options for
+https://github.com/netty/netty/wiki/Reference-counted-objects#troubleshooting-buffer-leaks[troubleshooting buffer leaks].

@@ -1,0 +1,18 @@
+include::page$attributes.adoc[]
+[[web-integration]]
+= Other Web Frameworks
+
+This chapter details Spring's integration with third-party web frameworks.
+
+One of the core value propositions of the Spring Framework is that of enabling
+_choice_. In a general sense, Spring does not force you to use or buy into any
+particular architecture, technology, or methodology (although it certainly recommends
+some over others). This freedom to pick and choose the architecture, technology, or
+methodology that is most relevant to a developer and their development team is
+arguably most evident in the web area, where Spring provides its own web frameworks
+(xref:mvc:mvc.adoc#mvc[Spring MVC] and xref:webflux:webflux.adoc#webflux[Spring WebFlux]) while, at the same time,
+supporting integration with a number of popular third-party web frameworks.
+
+
+
+

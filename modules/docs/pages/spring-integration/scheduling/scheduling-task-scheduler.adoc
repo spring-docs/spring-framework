@@ -1,0 +1,130 @@
+include::page$attributes.adoc[]
+[[scheduling-task-scheduler]]
+=== The Spring `TaskScheduler` Abstraction
+
+In addition to the `TaskExecutor` abstraction, Spring 3.0 introduced a `TaskScheduler`
+with a variety of methods for scheduling tasks to run at some point in the future.
+The following listing shows the `TaskScheduler` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface TaskScheduler {
+
+		ScheduledFuture schedule(Runnable task, Trigger trigger);
+
+		ScheduledFuture schedule(Runnable task, Instant startTime);
+
+		ScheduledFuture schedule(Runnable task, Date startTime);
+
+		ScheduledFuture scheduleAtFixedRate(Runnable task, Instant startTime, Duration period);
+
+		ScheduledFuture scheduleAtFixedRate(Runnable task, Date startTime, long period);
+
+		ScheduledFuture scheduleAtFixedRate(Runnable task, Duration period);
+
+		ScheduledFuture scheduleAtFixedRate(Runnable task, long period);
+
+		ScheduledFuture scheduleWithFixedDelay(Runnable task, Instant startTime, Duration delay);
+
+		ScheduledFuture scheduleWithFixedDelay(Runnable task, Date startTime, long delay);
+
+		ScheduledFuture scheduleWithFixedDelay(Runnable task, Duration delay);
+
+		ScheduledFuture scheduleWithFixedDelay(Runnable task, long delay);
+	}
+----
+
+The simplest method is the one named `schedule` that takes only a `Runnable` and a `Date`.
+That causes the task to run once after the specified time. All of the other methods
+are capable of scheduling tasks to run repeatedly. The fixed-rate and fixed-delay
+methods are for simple, periodic execution, but the method that accepts a `Trigger` is
+much more flexible.
+
+
+[[scheduling-trigger-interface]]
+==== `Trigger` Interface
+
+The `Trigger` interface is essentially inspired by JSR-236 which, as of Spring 3.0,
+was not yet officially implemented. The basic idea of the `Trigger` is that execution
+times may be determined based on past execution outcomes or even arbitrary conditions.
+If these determinations do take into account the outcome of the preceding execution,
+that information is available within a `TriggerContext`. The `Trigger` interface itself
+is quite simple, as the following listing shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface Trigger {
+
+		Date nextExecutionTime(TriggerContext triggerContext);
+	}
+----
+
+The `TriggerContext` is the most important part. It encapsulates all of
+the relevant data and is open for extension in the future, if necessary. The
+`TriggerContext` is an interface (a `SimpleTriggerContext` implementation is used by
+default). The following listing shows the available methods for `Trigger` implementations.
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface TriggerContext {
+
+		Date lastScheduledExecutionTime();
+
+		Date lastActualExecutionTime();
+
+		Date lastCompletionTime();
+	}
+----
+
+
+[[scheduling-trigger-implementations]]
+==== `Trigger` Implementations
+
+Spring provides two implementations of the `Trigger` interface. The most interesting one
+is the `CronTrigger`. It enables the scheduling of tasks based on cron expressions. For
+example, the following task is scheduled to run 15 minutes past each hour but only
+during the 9-to-5 "`business hours`" on weekdays:
+
+[source,java,indent=0]
+[subs="verbatim"]
+----
+	scheduler.schedule(task, new CronTrigger("0 15 9-17 * * MON-FRI"));
+----
+
+The other implementation is a `PeriodicTrigger` that accepts a fixed
+period, an optional initial delay value, and a boolean to indicate whether the period
+should be interpreted as a fixed-rate or a fixed-delay. Since the `TaskScheduler`
+interface already defines methods for scheduling tasks at a fixed rate or with a
+fixed delay, those methods should be used directly whenever possible. The value of the
+`PeriodicTrigger` implementation is that you can use it within components that rely on
+the `Trigger` abstraction. For example, it may be convenient to allow periodic triggers,
+cron-based triggers, and even custom trigger implementations to be used interchangeably.
+Such a component could take advantage of dependency injection so that you can configure such `Triggers`
+externally and, therefore, easily modify or extend them.
+
+
+[[scheduling-task-scheduler-implementations]]
+==== `TaskScheduler` implementations
+
+As with Spring's `TaskExecutor` abstraction, the primary benefit of the `TaskScheduler`
+arrangement is that an application's scheduling needs are decoupled from the deployment
+environment. This abstraction level is particularly relevant when deploying to an
+application server environment where threads should not be created directly by the
+application itself. For such scenarios, Spring provides a `TimerManagerTaskScheduler`
+that delegates to a CommonJ `TimerManager` on WebLogic or WebSphere as well as a more recent
+`DefaultManagedTaskScheduler` that delegates to a JSR-236 `ManagedScheduledExecutorService`
+in a Java EE 7+ environment. Both are typically configured with a JNDI lookup.
+
+Whenever external thread management is not a requirement, a simpler alternative is
+a local `ScheduledExecutorService` setup within the application, which can be adapted
+through Spring's `ConcurrentTaskScheduler`. As a convenience, Spring also provides a
+`ThreadPoolTaskScheduler`, which internally delegates to a `ScheduledExecutorService`
+to provide common bean-style configuration along the lines of `ThreadPoolTaskExecutor`.
+These variants work perfectly fine for locally embedded thread pool setups in lenient
+application server environments, as well -- in particular on Tomcat and Jetty.
+
+
+

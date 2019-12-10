@@ -1,0 +1,141 @@
+include::page$attributes.adoc[]
+[[oxm-marshaller-unmarshaller]]
+=== `Marshaller` and `Unmarshaller`
+
+As stated in the xref:oxm:oxm-introduction.adoc#oxm-introduction[introduction], a marshaller serializes an object
+to XML, and an unmarshaller deserializes XML stream to an object. This section describes
+the two Spring interfaces used for this purpose.
+
+
+[[oxm-marshaller]]
+==== Understanding `Marshaller`
+
+Spring abstracts all marshalling operations behind the
+`org.springframework.oxm.Marshaller` interface, the main method of which follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public interface Marshaller {
+
+		/**
+		 * Marshal the object graph with the given root into the provided Result.
+		 */
+		void marshal(Object graph, Result result) throws XmlMappingException, IOException;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	interface Marshaller {
+
+		/**
+		* Marshal the object graph with the given root into the provided Result.
+		*/
+		@Throws(XmlMappingException::class, IOException::class)
+		fun marshal(
+				graph: Any,
+				result: Result
+		)
+	}
+----
+
+
+The `Marshaller` interface has one main method, which marshals the given object to a
+given `javax.xml.transform.Result`. The result is a tagging interface that basically
+represents an XML output abstraction. Concrete implementations wrap various XML
+representations, as the following table indicates:
+
+[[oxm-marshller-tbl]]
+|===
+| Result implementation| Wraps XML representation
+
+| `DOMResult`
+| `org.w3c.dom.Node`
+
+| `SAXResult`
+| `org.xml.sax.ContentHandler`
+
+| `StreamResult`
+| `java.io.File`, `java.io.OutputStream`, or `java.io.Writer`
+|===
+
+NOTE: Although the `marshal()` method accepts a plain object as its first parameter, most
+`Marshaller` implementations cannot handle arbitrary objects. Instead, an object class
+must be mapped in a mapping file, be marked with an annotation, be registered with the
+marshaller, or have a common base class. Refer to the later sections in this chapter
+to determine how your O-X technology manages this.
+
+
+[[oxm-unmarshaller]]
+==== Understanding `Unmarshaller`
+
+Similar to the `Marshaller`, we have the `org.springframework.oxm.Unmarshaller`
+interface, which the following listing shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public interface Unmarshaller {
+
+		/**
+		 * Unmarshal the given provided Source into an object graph.
+		 */
+		Object unmarshal(Source source) throws XmlMappingException, IOException;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	interface Unmarshaller {
+
+		/**
+		* Unmarshal the given provided Source into an object graph.
+		*/
+		@Throws(XmlMappingException::class, IOException::class)
+		fun unmarshal(source: Source): Any
+	}
+----
+
+This interface also has one method, which reads from the given
+`javax.xml.transform.Source` (an XML input abstraction) and returns the object read. As
+with `Result`, `Source` is a tagging interface that has three concrete implementations. Each
+wraps a different XML representation, as the following table indicates:
+
+[[oxm-unmarshller-tbl]]
+|===
+| Source implementation| Wraps XML representation
+
+| `DOMSource`
+| `org.w3c.dom.Node`
+
+| `SAXSource`
+| `org.xml.sax.InputSource`, and `org.xml.sax.XMLReader`
+
+| `StreamSource`
+| `java.io.File`, `java.io.InputStream`, or `java.io.Reader`
+|===
+
+Even though there are two separate marshalling interfaces (`Marshaller` and
+`Unmarshaller`), all implementations in Spring-WS implement both in one class.
+This means that you can wire up one marshaller class and refer to it both as a
+marshaller and as an unmarshaller in your `applicationContext.xml`.
+
+
+[[oxm-xmlmappingexception]]
+==== Understanding `XmlMappingException`
+
+Spring converts exceptions from the underlying O-X mapping tool to its own exception
+hierarchy with the `XmlMappingException` as the root exception.
+These runtime exceptions wrap the original exception so that no information will be lost.
+
+Additionally, the `MarshallingFailureException` and `UnmarshallingFailureException`
+provide a distinction between marshalling and unmarshalling operations, even though the
+underlying O-X mapping tool does not do so.
+
+The O-X Mapping exception hierarchy is shown in the following figure:
+
+image::images/oxm-exceptions.png[]
+
+
+

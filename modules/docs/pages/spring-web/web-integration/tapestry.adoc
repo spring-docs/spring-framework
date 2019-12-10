@@ -1,0 +1,17 @@
+include::page$attributes.adoc[]
+[[tapestry]]
+== Apache Tapestry 5.x
+
+https://tapestry.apache.org/[Tapestry] is a ""Component oriented framework for creating
+dynamic, robust, highly scalable web applications in Java.""
+
+While Spring has its own xref:mvc:mvc.adoc#mvc[powerful web layer], there are a number of unique
+advantages to building an enterprise Java application by using a combination of Tapestry
+for the web user interface and the Spring container for the lower layers.
+
+For more information, see Tapestry's dedicated
+https://tapestry.apache.org/integrating-with-spring-framework.html[integration module for Spring].
+
+
+
+

@@ -1,0 +1,18 @@
+include::page$attributes.adoc[]
+[[databuffers-buffer]]
+== `DataBuffer`
+
+The `DataBuffer` interface offers similar operations as `java.nio.ByteBuffer` but also
+brings a few additional benefits some of which are inspired by the Netty `ByteBuf`.
+Below is a partial list of benefits:
+
+* Read and write with independent positions, i.e. not requiring a call to `flip()` to
+alternate between read and write.
+* Capacity expanded on demand as with `java.lang.StringBuilder`.
+* Pooled buffers and reference counting via xref:databuffers:databuffers-buffer-pooled.adoc#databuffers-buffer-pooled[databuffers-buffer-pooled].
+* View a buffer as `java.nio.ByteBuffer`, `InputStream`, or `OutputStream`.
+* Determine the index, or the last index, for a given byte.
+
+
+
+

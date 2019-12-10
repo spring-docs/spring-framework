@@ -1,0 +1,68 @@
+include::page$attributes.adoc[]
+[[oxm-jibx]]
+=== JiBX
+
+The JiBX framework offers a solution similar to that which Hibernate provides for ORM: A
+binding definition defines the rules for how your Java objects are converted to or from
+XML. After preparing the binding and compiling the classes, a JiBX binding compiler
+enhances the class files and adds code to handle converting instances of the classes
+from or to XML.
+
+For more information on JiBX, see the http://jibx.sourceforge.net/[JiBX web
+site]. The Spring integration classes reside in the `org.springframework.oxm.jibx`
+package.
+
+
+[[oxm-jibx-marshaller]]
+==== Using `JibxMarshaller`
+
+The `JibxMarshaller` class implements both the `Marshaller` and `Unmarshaller`
+interface. To operate, it requires the name of the class to marshal in, which you can
+set using the `targetClass` property. Optionally, you can set the binding name by setting the
+`bindingName` property. In the following example, we bind the `Flights` class:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="jibxFlightsMarshaller" class="org.springframework.oxm.jibx.JibxMarshaller">
+			<property name="targetClass">org.springframework.oxm.jibx.Flights</property>
+		</bean>
+		...
+	</beans>
+----
+
+A `JibxMarshaller` is configured for a single class. If you want to marshal multiple
+classes, you have to configure multiple `JibxMarshaller` instances with different `targetClass`
+property values.
+
+[[oxm-jibx-xsd]]
+===== XML Configuration Namespace
+
+The `jibx-marshaller` tag configures a `org.springframework.oxm.jibx.JibxMarshaller`,
+as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<oxm:jibx-marshaller id="marshaller" target-class="org.springframework.ws.samples.airline.schema.Flight"/>
+----
+
+The following table describes the available attributes:
+
+|===
+| Attribute| Description| Required
+
+| `id`
+| The ID of the marshaller
+| No
+
+| `target-class`
+| The target class for this marshaller
+| Yes
+
+| `bindingName`
+| The binding name used by this marshaller
+| No
+|===
+
+
+

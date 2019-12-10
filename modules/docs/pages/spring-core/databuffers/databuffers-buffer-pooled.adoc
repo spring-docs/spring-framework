@@ -1,0 +1,26 @@
+include::page$attributes.adoc[]
+[[databuffers-buffer-pooled]]
+== `PooledDataBuffer`
+
+As explained in the Javadoc for
+https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html[ByteBuffer],
+byte buffers can be direct or non-direct. Direct buffers may reside outside the Java heap
+which eliminates the need for copying for native I/O operations. That makes direct buffers
+particularly useful for receiving and sending data over a socket, but they're also more
+expensive to create and release, which leads to the idea of pooling buffers.
+
+`PooledDataBuffer` is an extension of `DataBuffer` that helps with reference counting which
+is essential for byte buffer pooling. How does it work? When a `PooledDataBuffer` is
+allocated the reference count is at 1. Calls to `retain()` increment the count, while
+calls to `release()` decrement it. As long as the count is above 0, the buffer is
+guaranteed not to be released. When the count is decreased to 0, the pooled buffer can be
+released, which in practice could mean the reserved memory for the buffer is returned to
+the memory pool.
+
+Note that instead of operating on `PooledDataBuffer` directly, in most cases it's better
+to use the convenience methods in `DataBufferUtils` that apply release or retain to a
+`DataBuffer` only if it is an instance of `PooledDataBuffer`.
+
+
+
+

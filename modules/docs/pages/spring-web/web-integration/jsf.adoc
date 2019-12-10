@@ -1,0 +1,61 @@
+include::page$attributes.adoc[]
+[[jsf]]
+== JSF
+
+JavaServer Faces (JSF) is the JCP's standard component-based, event-driven web
+user interface framework. It is an official part of the Java EE umbrella but also
+individually usable, e.g. through embedding Mojarra or MyFaces within Tomcat.
+
+Please note that recent versions of JSF became closely tied to CDI infrastructure
+in application servers, with some new JSF functionality only working in such an
+environment. Spring's JSF support is not actively evolved anymore and primarily
+exists for migration purposes when modernizing older JSF-based applications.
+
+The key element in Spring's JSF integration is the JSF `ELResolver` mechanism.
+
+
+
+[[jsf-springbeanfaceselresolver]]
+=== Spring Bean Resolver
+
+`SpringBeanFacesELResolver` is a JSF compliant `ELResolver` implementation,
+integrating with the standard Unified EL as used by JSF and JSP. It delegates to
+Spring's "`business context`" `WebApplicationContext` first and then to the
+default resolver of the underlying JSF implementation.
+
+Configuration-wise, you can define `SpringBeanFacesELResolver` in your JSF
+`faces-context.xml` file, as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<faces-config>
+		<application>
+			<el-resolver>org.springframework.web.jsf.el.SpringBeanFacesELResolver</el-resolver>
+			...
+		</application>
+	</faces-config>
+----
+
+
+
+[[jsf-facescontextutils]]
+=== Using `FacesContextUtils`
+
+A custom `ELResolver` works well when mapping your properties to beans in
+`faces-config.xml`, but, at times, you may need to explicitly grab a bean.
+The {api-spring-framework}/web/jsf/FacesContextUtils.html[`FacesContextUtils`]
+class makes this easy. It is similar to `WebApplicationContextUtils`, except that
+it takes a `FacesContext` parameter rather than a `ServletContext` parameter.
+
+The following example shows how to use `FacesContextUtils`:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	ApplicationContext ctx = FacesContextUtils.getWebApplicationContext(FacesContext.getCurrentInstance());
+----
+
+
+
+

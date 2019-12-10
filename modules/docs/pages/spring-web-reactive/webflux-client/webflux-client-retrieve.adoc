@@ -1,0 +1,81 @@
+include::page$attributes.adoc[]
+[[webflux-client-retrieve]]
+== `retrieve()`
+
+The `retrieve()` method is the easiest way to get a response body and decode it.
+The following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	WebClient client = WebClient.create("https://example.org");
+
+	Mono<Person> result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.retrieve()
+			.bodyToMono(Person.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val client = WebClient.create("https://example.org")
+
+	val result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.retrieve()
+			.awaitBody<Person>()
+----
+
+You can also get a stream of objects decoded from the response, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Flux<Quote> result = client.get()
+			.uri("/quotes").accept(MediaType.TEXT_EVENT_STREAM)
+			.retrieve()
+			.bodyToFlux(Quote.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val result = client.get()
+			.uri("/quotes").accept(MediaType.TEXT_EVENT_STREAM)
+			.retrieve()
+			.bodyToFlow<Quote>()
+----
+
+By default, responses with 4xx or 5xx status codes result in an
+`WebClientResponseException` or one of its HTTP status specific sub-classes, such as
+`WebClientResponseException.BadRequest`, `WebClientResponseException.NotFound`, and others.
+You can also use the `onStatus` method to customize the resulting exception,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Mono<Person> result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.retrieve()
+			.onStatus(HttpStatus::is4xxClientError, response -> ...)
+			.onStatus(HttpStatus::is5xxServerError, response -> ...)
+			.bodyToMono(Person.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.retrieve()
+			.onStatus(HttpStatus::is4xxClientError) { ... }
+			.onStatus(HttpStatus::is5xxServerError) { ... }
+			.awaitBody<Person>()
+----
+
+When `onStatus` is used, if the response is expected to have content, then the `onStatus`
+callback should consume it. If not, the content will be automatically drained to ensure
+resources are released.
+
+
+
+

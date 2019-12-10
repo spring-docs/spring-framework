@@ -1,0 +1,17 @@
+include::page$attributes.adoc[]
+[[databuffers-utils]]
+== `DataBufferUtils`
+
+`DataBufferUtils` offers a number of utility methods to operate on data buffers:
+
+* Join a stream of data buffers into a single buffer possibly with zero copy, e.g. via
+composite buffers, if that's supported by the underlying byte buffer API.
+* Turn `InputStream` or NIO `Channel` into `Flux<DataBuffer>`, and vice versa a
+`Publisher<DataBuffer>` into `OutputStream` or NIO `Channel`.
+* Methods to release or retain a `DataBuffer` if the buffer is an instance of
+`PooledDataBuffer`.
+* Skip or take from a stream of bytes until a specific byte count.
+
+
+
+

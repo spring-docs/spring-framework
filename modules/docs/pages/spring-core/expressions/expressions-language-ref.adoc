@@ -1,0 +1,1211 @@
+include::page$attributes.adoc[]
+[[expressions-language-ref]]
+== Language Reference
+
+This section describes how the Spring Expression Language works. It covers the following
+topics:
+
+* xref:expressions:expressions-language-ref:expressions-ref-literal.adoc#expressions-ref-literal[expressions-ref-literal]
+* xref:expressions:expressions-language-ref:expressions-properties-arrays.adoc#expressions-properties-arrays[expressions-properties-arrays]
+* xref:expressions:expressions-language-ref:expressions-inline-lists.adoc#expressions-inline-lists[expressions-inline-lists]
+* xref:expressions:expressions-language-ref:expressions-inline-maps.adoc#expressions-inline-maps[expressions-inline-maps]
+* xref:expressions:expressions-language-ref:expressions-array-construction.adoc#expressions-array-construction[expressions-array-construction]
+* xref:expressions:expressions-language-ref:expressions-methods.adoc#expressions-methods[expressions-methods]
+* xref:expressions:expressions-language-ref:expressions-operators.adoc#expressions-operators[expressions-operators]
+* xref:expressions:expressions-language-ref:expressions-types.adoc#expressions-types[expressions-types]
+* xref:expressions:expressions-language-ref:expressions-constructors.adoc#expressions-constructors[expressions-constructors]
+* xref:expressions:expressions-language-ref:expressions-ref-variables.adoc#expressions-ref-variables[expressions-ref-variables]
+* xref:expressions:expressions-language-ref:expressions-ref-functions.adoc#expressions-ref-functions[expressions-ref-functions]
+* xref:expressions:expressions-language-ref:expressions-bean-references.adoc#expressions-bean-references[expressions-bean-references]
+* xref:expressions:expressions-language-ref:expressions-operator-ternary.adoc#expressions-operator-ternary[expressions-operator-ternary]
+* xref:expressions:expressions-language-ref:expressions-operator-elvis.adoc#expressions-operator-elvis[expressions-operator-elvis]
+* xref:expressions:expressions-language-ref:expressions-operator-safe-navigation.adoc#expressions-operator-safe-navigation[expressions-operator-safe-navigation]
+
+
+
+[[expressions-ref-literal]]
+=== Literal Expressions
+
+The types of literal expressions supported are strings, numeric values (int, real, hex),
+boolean, and null. Strings are delimited by single quotation marks. To put a single quotation mark itself
+in a string, use two single quotation mark characters.
+
+The following listing shows simple usage of literals. Typically, they are not used
+in isolation like this but, rather, as part of a more complex expression -- for example,
+using a literal on one side of a logical comparison operator.
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+
+	// evals to "Hello World"
+	String helloWorld = (String) parser.parseExpression("'Hello World'").getValue();
+
+	double avogadrosNumber = (Double) parser.parseExpression("6.0221415E+23").getValue();
+
+	// evals to 2147483647
+	int maxValue = (Integer) parser.parseExpression("0x7FFFFFFF").getValue();
+
+	boolean trueValue = (Boolean) parser.parseExpression("true").getValue();
+
+	Object nullValue = parser.parseExpression("null").getValue();
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+
+	// evals to "Hello World"
+	val helloWorld = parser.parseExpression("'Hello World'").value as String
+
+	val avogadrosNumber = parser.parseExpression("6.0221415E+23").value as Double
+
+	// evals to 2147483647
+	val maxValue = parser.parseExpression("0x7FFFFFFF").value as Int
+
+	val trueValue = parser.parseExpression("true").value as Boolean
+
+	val nullValue = parser.parseExpression("null").value
+----
+
+Numbers support the use of the negative sign, exponential notation, and decimal points.
+By default, real numbers are parsed by using Double.parseDouble().
+
+
+
+[[expressions-properties-arrays]]
+=== Properties, Arrays, Lists, Maps, and Indexers
+
+Navigating with property references is easy. To do so, use a period to indicate a nested
+property value. The instances of the `Inventor` class, `pupin` and `tesla`, were populated with
+data listed in the xref:expressions:expressions-example-classes.adoc#expressions-example-classes[Classes used in the examples] section.
+To navigate "`down`" and get Tesla's year of birth and Pupin's city of birth, we use the following
+expressions:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// evals to 1856
+	int year = (Integer) parser.parseExpression("Birthdate.Year + 1900").getValue(context);
+
+	String city = (String) parser.parseExpression("placeOfBirth.City").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// evals to 1856
+	val year = parser.parseExpression("Birthdate.Year + 1900").getValue(context) as Int
+
+	val city = parser.parseExpression("placeOfBirth.City").getValue(context) as String
+----
+
+Case insensitivity is allowed for the first letter of property names. The contents of
+arrays and lists are obtained by using square bracket notation, as the following example
+shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+
+	// Inventions Array
+
+	// evaluates to "Induction motor"
+	String invention = parser.parseExpression("inventions[3]").getValue(
+			context, tesla, String.class);
+
+	// Members List
+
+	// evaluates to "Nikola Tesla"
+	String name = parser.parseExpression("Members[0].Name").getValue(
+			context, ieee, String.class);
+
+	// List and Array navigation
+	// evaluates to "Wireless communication"
+	String invention = parser.parseExpression("Members[0].Inventions[6]").getValue(
+			context, ieee, String.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+	val context = SimpleEvaluationContext.forReadOnlyDataBinding().build()
+
+	// Inventions Array
+
+	// evaluates to "Induction motor"
+	val invention = parser.parseExpression("inventions[3]").getValue(
+			context, tesla, String::class.java)
+
+	// Members List
+
+	// evaluates to "Nikola Tesla"
+	val name = parser.parseExpression("Members[0].Name").getValue(
+			context, ieee, String::class.java)
+
+	// List and Array navigation
+	// evaluates to "Wireless communication"
+	val invention = parser.parseExpression("Members[0].Inventions[6]").getValue(
+			context, ieee, String::class.java)
+----
+
+The contents of maps are obtained by specifying the literal key value within the
+brackets. In the following example, because keys for the `Officers` map are strings, we can specify
+string literals:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// Officer's Dictionary
+
+	Inventor pupin = parser.parseExpression("Officers['president']").getValue(
+			societyContext, Inventor.class);
+
+	// evaluates to "Idvor"
+	String city = parser.parseExpression("Officers['president'].PlaceOfBirth.City").getValue(
+			societyContext, String.class);
+
+	// setting values
+	parser.parseExpression("Officers['advisors'][0].PlaceOfBirth.Country").setValue(
+			societyContext, "Croatia");
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// Officer's Dictionary
+
+	val pupin = parser.parseExpression("Officers['president']").getValue(
+			societyContext, Inventor::class.java)
+
+	// evaluates to "Idvor"
+	val city = parser.parseExpression("Officers['president'].PlaceOfBirth.City").getValue(
+			societyContext, String::class.java)
+
+	// setting values
+	parser.parseExpression("Officers['advisors'][0].PlaceOfBirth.Country").setValue(
+			societyContext, "Croatia")
+----
+
+
+
+[[expressions-inline-lists]]
+=== Inline Lists
+
+You can directly express lists in an expression by using `{}` notation.
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// evaluates to a Java list containing the four numbers
+	List numbers = (List) parser.parseExpression("{1,2,3,4}").getValue(context);
+
+	List listOfLists = (List) parser.parseExpression("{{'a','b'},{'x','y'}}").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// evaluates to a Java list containing the four numbers
+	val numbers = parser.parseExpression("{1,2,3,4}").getValue(context) as List<*>
+
+	val listOfLists = parser.parseExpression("{{'a','b'},{'x','y'}}").getValue(context) as List<*>
+----
+
+`{}` by itself means an empty list. For performance reasons, if the list is itself
+entirely composed of fixed literals,  a constant list is created to represent the
+expression (rather than building a new list on each evaluation).
+
+
+
+[[expressions-inline-maps]]
+=== Inline Maps
+
+You can also directly express maps in an expression by using `{key:value}` notation. The
+following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// evaluates to a Java map containing the two entries
+	Map inventorInfo = (Map) parser.parseExpression("{name:'Nikola',dob:'10-July-1856'}").getValue(context);
+
+	Map mapOfMaps = (Map) parser.parseExpression("{name:{first:'Nikola',last:'Tesla'},dob:{day:10,month:'July',year:1856}}").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// evaluates to a Java map containing the two entries
+	val inventorInfo = parser.parseExpression("{name:'Nikola',dob:'10-July-1856'}").getValue(context) as Map<*, *>
+
+	val mapOfMaps = parser.parseExpression("{name:{first:'Nikola',last:'Tesla'},dob:{day:10,month:'July',year:1856}}").getValue(context) as Map<*, *>	
+----
+
+`{:}` by itself means an empty map. For performance reasons, if the map is itself composed
+of fixed literals or other nested constant structures (lists or maps), a constant map is created
+to represent the expression (rather than building a new map on each evaluation). Quoting of the map keys
+is optional. The examples above do not use quoted keys.
+
+
+
+[[expressions-array-construction]]
+=== Array Construction
+
+You can build arrays by using the familiar Java syntax, optionally supplying an initializer
+to have the array populated at construction time. The following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	int[] numbers1 = (int[]) parser.parseExpression("new int[4]").getValue(context);
+
+	// Array with initializer
+	int[] numbers2 = (int[]) parser.parseExpression("new int[]{1,2,3}").getValue(context);
+
+	// Multi dimensional array
+	int[][] numbers3 = (int[][]) parser.parseExpression("new int[4][5]").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val numbers1 = parser.parseExpression("new int[4]").getValue(context) as IntArray
+
+	// Array with initializer
+	val numbers2 = parser.parseExpression("new int[]{1,2,3}").getValue(context) as IntArray
+
+	// Multi dimensional array
+	val numbers3 = parser.parseExpression("new int[4][5]").getValue(context) as Array<IntArray>
+----
+
+You cannot currently supply an initializer when you construct
+multi-dimensional array.
+
+
+
+[[expressions-methods]]
+=== Methods
+
+You can invoke methods by using typical Java programming syntax. You can also invoke methods
+on literals. Variable arguments are also supported. The following examples show how to
+invoke methods:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// string literal, evaluates to "bc"
+	String bc = parser.parseExpression("'abc'.substring(1, 3)").getValue(String.class);
+
+	// evaluates to true
+	boolean isMember = parser.parseExpression("isMember('Mihajlo Pupin')").getValue(
+			societyContext, Boolean.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// string literal, evaluates to "bc"
+	val bc = parser.parseExpression("'abc'.substring(1, 3)").getValue(String::class.java)
+
+	// evaluates to true
+	val isMember = parser.parseExpression("isMember('Mihajlo Pupin')").getValue(
+			societyContext, Boolean::class.java)
+----
+
+
+[[expressions-operators]]
+=== Operators
+
+The Spring Expression Language supports the following kinds of operators:
+
+* xref:expressions:expressions-language-ref:expressions-operators.adoc#expressions-operators-relational[expressions-operators-relational]
+* xref:expressions:expressions-language-ref:expressions-operators.adoc#expressions-operators-logical[expressions-operators-logical]
+* xref:expressions:expressions-language-ref:expressions-operators.adoc#expressions-operators-mathematical[expressions-operators-mathematical]
+* xref:expressions:expressions-language-ref:expressions-operators.adoc#expressions-assignment[expressions-assignment]
+
+
+[[expressions-operators-relational]]
+==== Relational Operators
+
+The relational operators (equal, not equal, less than, less than or equal, greater than,
+and greater than or equal) are supported by using standard operator notation. The
+following listing shows a few examples of operators:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// evaluates to true
+	boolean trueValue = parser.parseExpression("2 == 2").getValue(Boolean.class);
+
+	// evaluates to false
+	boolean falseValue = parser.parseExpression("2 < -5.0").getValue(Boolean.class);
+
+	// evaluates to true
+	boolean trueValue = parser.parseExpression("'black' < 'block'").getValue(Boolean.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// evaluates to true
+	val trueValue = parser.parseExpression("2 == 2").getValue(Boolean::class.java)
+
+	// evaluates to false
+	val falseValue = parser.parseExpression("2 < -5.0").getValue(Boolean::class.java)
+
+	// evaluates to true
+	val trueValue = parser.parseExpression("'black' < 'block'").getValue(Boolean::class.java)
+----
+
+[NOTE]
+====
+Greater-than and less-than comparisons against `null` follow a simple rule: `null` is treated as
+nothing (that is NOT as zero). As a consequence, any other value is always greater
+than `null` (`X > null` is always `true`) and no other value is ever less than nothing
+(`X < null` is always `false`).
+
+If you prefer numeric comparisons instead, avoid number-based `null` comparisons
+in favor of comparisons against zero (for example, `X > 0` or `X < 0`).
+====
+
+In addition to the standard relational operators, SpEL supports the `instanceof` and regular
+expression-based `matches` operator. The following listing shows examples of both:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// evaluates to false
+	boolean falseValue = parser.parseExpression(
+			"'xyz' instanceof T(Integer)").getValue(Boolean.class);
+
+	// evaluates to true
+	boolean trueValue = parser.parseExpression(
+			"'5.00' matches '^-?\\d+(\\.\\d{2})?$'").getValue(Boolean.class);
+
+	//evaluates to false
+	boolean falseValue = parser.parseExpression(
+			"'5.0067' matches '^-?\\d+(\\.\\d{2})?$'").getValue(Boolean.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// evaluates to false
+	val falseValue = parser.parseExpression(
+			"'xyz' instanceof T(Integer)").getValue(Boolean::class.java)
+
+	// evaluates to true
+	val trueValue = parser.parseExpression(
+			"'5.00' matches '^-?\\d+(\\.\\d{2})?$'").getValue(Boolean::class.java)
+
+	//evaluates to false
+	val falseValue = parser.parseExpression(
+			"'5.0067' matches '^-?\\d+(\\.\\d{2})?$'").getValue(Boolean::class.java)
+----
+
+CAUTION: Be careful with primitive types, as they are immediately boxed up to the wrapper type,
+so `1 instanceof T(int)` evaluates to `false` while `1 instanceof T(Integer)`
+evaluates to `true`, as expected.
+
+Each symbolic operator can also be specified as a purely alphabetic equivalent. This
+avoids problems where the symbols used have special meaning for the document type in
+which the expression is embedded (such as in an XML document). The textual equivalents are:
+
+* `lt` (`<`)
+* `gt` (`>`)
+* `le` (`\<=`)
+* `ge` (`>=`)
+* `eq` (`==`)
+* `ne` (`!=`)
+* `div` (`/`)
+* `mod` (`%`)
+* `not` (`!`).
+
+All of the textual operators are case-insensitive.
+
+
+[[expressions-operators-logical]]
+==== Logical Operators
+
+SpEL supports the following logical operators:
+
+* `and`
+* `or`
+* `not`
+
+The following example shows how to use the logical operators
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// -- AND --
+
+	// evaluates to false
+	boolean falseValue = parser.parseExpression("true and false").getValue(Boolean.class);
+
+	// evaluates to true
+	String expression = "isMember('Nikola Tesla') and isMember('Mihajlo Pupin')";
+	boolean trueValue = parser.parseExpression(expression).getValue(societyContext, Boolean.class);
+
+	// -- OR --
+
+	// evaluates to true
+	boolean trueValue = parser.parseExpression("true or false").getValue(Boolean.class);
+
+	// evaluates to true
+	String expression = "isMember('Nikola Tesla') or isMember('Albert Einstein')";
+	boolean trueValue = parser.parseExpression(expression).getValue(societyContext, Boolean.class);
+
+	// -- NOT --
+
+	// evaluates to false
+	boolean falseValue = parser.parseExpression("!true").getValue(Boolean.class);
+
+	// -- AND and NOT --
+	String expression = "isMember('Nikola Tesla') and !isMember('Mihajlo Pupin')";
+	boolean falseValue = parser.parseExpression(expression).getValue(societyContext, Boolean.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// -- AND --
+
+	// evaluates to false
+	val falseValue = parser.parseExpression("true and false").getValue(Boolean::class.java)
+
+	// evaluates to true
+	val expression = "isMember('Nikola Tesla') and isMember('Mihajlo Pupin')"
+	val trueValue = parser.parseExpression(expression).getValue(societyContext, Boolean::class.java)
+
+	// -- OR --
+
+	// evaluates to true
+	val trueValue = parser.parseExpression("true or false").getValue(Boolean::class.java)
+
+	// evaluates to true
+	val expression = "isMember('Nikola Tesla') or isMember('Albert Einstein')"
+	val trueValue = parser.parseExpression(expression).getValue(societyContext, Boolean::class.java)
+
+	// -- NOT --
+
+	// evaluates to false
+	val falseValue = parser.parseExpression("!true").getValue(Boolean::class.java)
+
+	// -- AND and NOT --
+	val expression = "isMember('Nikola Tesla') and !isMember('Mihajlo Pupin')"
+	val falseValue = parser.parseExpression(expression).getValue(societyContext, Boolean::class.java)
+----
+
+
+[[expressions-operators-mathematical]]
+==== Mathematical Operators
+
+You can use the addition operator on both numbers and strings. You can use the subtraction, multiplication,
+and division operators only on numbers. You can also use
+the modulus (%) and exponential power (^) operators. Standard operator precedence is enforced. The
+following example shows the mathematical operators in use:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// Addition
+	int two = parser.parseExpression("1 + 1").getValue(Integer.class);  // 2
+
+	String testString = parser.parseExpression(
+			"'test' + ' ' + 'string'").getValue(String.class);  // 'test string'
+
+	// Subtraction
+	int four = parser.parseExpression("1 - -3").getValue(Integer.class);  // 4
+
+	double d = parser.parseExpression("1000.00 - 1e4").getValue(Double.class);  // -9000
+
+	// Multiplication
+	int six = parser.parseExpression("-2 * -3").getValue(Integer.class);  // 6
+
+	double twentyFour = parser.parseExpression("2.0 * 3e0 * 4").getValue(Double.class);  // 24.0
+
+	// Division
+	int minusTwo = parser.parseExpression("6 / -3").getValue(Integer.class);  // -2
+
+	double one = parser.parseExpression("8.0 / 4e0 / 2").getValue(Double.class);  // 1.0
+
+	// Modulus
+	int three = parser.parseExpression("7 % 4").getValue(Integer.class);  // 3
+
+	int one = parser.parseExpression("8 / 5 % 2").getValue(Integer.class);  // 1
+
+	// Operator precedence
+	int minusTwentyOne = parser.parseExpression("1+2-3*8").getValue(Integer.class);  // -21
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// Addition
+	val two = parser.parseExpression("1 + 1").getValue(Int::class.java)  // 2
+
+	val testString = parser.parseExpression(
+			"'test' + ' ' + 'string'").getValue(String::class.java)  // 'test string'
+
+	// Subtraction
+	val four = parser.parseExpression("1 - -3").getValue(Int::class.java)  // 4
+
+	val d = parser.parseExpression("1000.00 - 1e4").getValue(Double::class.java)  // -9000
+
+	// Multiplication
+	val six = parser.parseExpression("-2 * -3").getValue(Int::class.java)  // 6
+
+	val twentyFour = parser.parseExpression("2.0 * 3e0 * 4").getValue(Double::class.java)  // 24.0
+
+	// Division
+	val minusTwo = parser.parseExpression("6 / -3").getValue(Int::class.java)  // -2
+
+	val one = parser.parseExpression("8.0 / 4e0 / 2").getValue(Double::class.java)  // 1.0
+
+	// Modulus
+	val three = parser.parseExpression("7 % 4").getValue(Int::class.java)  // 3
+
+	val one = parser.parseExpression("8 / 5 % 2").getValue(Int::class.java)  // 1
+
+	// Operator precedence
+	val minusTwentyOne = parser.parseExpression("1+2-3*8").getValue(Int::class.java)  // -21	
+----
+
+
+[[expressions-assignment]]
+==== The Assignment Operator
+
+To setting a property, use the assignment operator (`=`). This is typically
+done within a call to `setValue` but can also be done inside a call to `getValue`. The
+following listing shows both ways to use the assignment operator:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Inventor inventor = new Inventor();
+	EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+
+	parser.parseExpression("Name").setValue(context, inventor, "Aleksandar Seovic");
+
+	// alternatively
+	String aleks = parser.parseExpression(
+			"Name = 'Aleksandar Seovic'").getValue(context, inventor, String.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val inventor = Inventor()
+	val context = SimpleEvaluationContext.forReadWriteDataBinding().build()
+
+	parser.parseExpression("Name").setValue(context, inventor, "Aleksandar Seovic")
+
+	// alternatively
+	val aleks = parser.parseExpression(
+			"Name = 'Aleksandar Seovic'").getValue(context, inventor, String::class.java)
+----
+
+
+[[expressions-types]]
+=== Types
+
+You can use the special `T` operator to specify an instance of `java.lang.Class` (the
+type). Static methods are invoked by using this operator as well. The
+`StandardEvaluationContext` uses a `TypeLocator` to find types, and the
+`StandardTypeLocator` (which can be replaced) is built with an understanding of the
+`java.lang` package. This means that `T()` references to types within `java.lang` do not need to be
+fully qualified, but all other type references must be. The following example shows how
+to use the `T` operator:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Class dateClass = parser.parseExpression("T(java.util.Date)").getValue(Class.class);
+
+	Class stringClass = parser.parseExpression("T(String)").getValue(Class.class);
+
+	boolean trueValue = parser.parseExpression(
+			"T(java.math.RoundingMode).CEILING < T(java.math.RoundingMode).FLOOR")
+			.getValue(Boolean.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val dateClass = parser.parseExpression("T(java.util.Date)").getValue(Class::class.java)
+
+	val stringClass = parser.parseExpression("T(String)").getValue(Class::class.java)
+
+	val trueValue = parser.parseExpression(
+			"T(java.math.RoundingMode).CEILING < T(java.math.RoundingMode).FLOOR")
+			.getValue(Boolean::class.java)
+----
+
+
+
+[[expressions-constructors]]
+=== Constructors
+
+You can invoke constructors by using the `new` operator. You should use the fully qualified class name
+for all but the primitive types (`int`, `float`, and so on) and String. The following
+example shows how to use the `new` operator to invoke constructors:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Inventor einstein = p.parseExpression(
+			"new org.spring.samples.spel.inventor.Inventor('Albert Einstein', 'German')")
+			.getValue(Inventor.class);
+
+	//create new inventor instance within add method of List
+	p.parseExpression(
+			"Members.add(new org.spring.samples.spel.inventor.Inventor(
+				'Albert Einstein', 'German'))").getValue(societyContext);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val einstein = p.parseExpression(
+			"new org.spring.samples.spel.inventor.Inventor('Albert Einstein', 'German')")
+			.getValue(Inventor::class.java)
+
+	//create new inventor instance within add method of List
+	p.parseExpression(
+			"Members.add(new org.spring.samples.spel.inventor.Inventor('Albert Einstein', 'German'))")
+			.getValue(societyContext)
+----
+
+
+
+[[expressions-ref-variables]]
+=== Variables
+
+You can reference variables in the expression by using the `#variableName` syntax. Variables
+are set by using the `setVariable` method on `EvaluationContext` implementations. The
+following example shows how to use variables:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Inventor tesla = new Inventor("Nikola Tesla", "Serbian");
+
+	EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+	context.setVariable("newName", "Mike Tesla");
+
+	parser.parseExpression("Name = #newName").getValue(context, tesla);
+	System.out.println(tesla.getName())  // "Mike Tesla"
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val tesla = Inventor("Nikola Tesla", "Serbian")
+
+	val context = SimpleEvaluationContext.forReadWriteDataBinding().build()
+	context.setVariable("newName", "Mike Tesla")
+
+	parser.parseExpression("Name = #newName").getValue(context, tesla)
+	println(tesla.name)  // "Mike Tesla"
+----
+
+
+[[expressions-this-root]]
+==== The `#this` and `#root` Variables
+
+The `#this` variable is always defined and refers to the current evaluation object
+(against which unqualified references are resolved). The `#root` variable is always
+defined and refers to the root context object. Although `#this` may vary as components of
+an expression are evaluated, `#root` always refers to the root. The following examples
+show how to use the `#this` and `#root` variables:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// create an array of integers
+	List<Integer> primes = new ArrayList<Integer>();
+	primes.addAll(Arrays.asList(2,3,5,7,11,13,17));
+
+	// create parser and set variable 'primes' as the array of integers
+	ExpressionParser parser = new SpelExpressionParser();
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataAccess();
+	context.setVariable("primes", primes);
+
+	// all prime numbers > 10 from the list (using selection ?{...})
+	// evaluates to [11, 13, 17]
+	List<Integer> primesGreaterThanTen = (List<Integer>) parser.parseExpression(
+			"#primes.?[#this>10]").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// create an array of integers
+	val primes = ArrayList<Int>()
+	primes.addAll(listOf(2, 3, 5, 7, 11, 13, 17))
+
+	// create parser and set variable 'primes' as the array of integers
+	val parser = SpelExpressionParser()
+	val context = SimpleEvaluationContext.forReadOnlyDataAccess()
+	context.setVariable("primes", primes)
+
+	// all prime numbers > 10 from the list (using selection ?{...})
+	// evaluates to [11, 13, 17]
+	val primesGreaterThanTen = parser.parseExpression(
+			"#primes.?[#this>10]").getValue(context) as List<Int>
+----
+
+
+
+[[expressions-ref-functions]]
+=== Functions
+
+You can extend SpEL by registering user-defined functions that can be called within the
+expression string. The function is registered through the `EvaluationContext`. The
+following example shows how to register a user-defined function:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Method method = ...;
+
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+	context.setVariable("myFunction", method);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val method: Method = ...
+
+	val context = SimpleEvaluationContext.forReadOnlyDataBinding().build()
+	context.setVariable("myFunction", method)
+----
+
+For example, consider the following utility method that reverses a string:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public abstract class StringUtils {
+
+		public static String reverseString(String input) {
+			StringBuilder backwards = new StringBuilder(input.length());
+			for (int i = 0; i < input.length(); i++) {
+				backwards.append(input.charAt(input.length() - 1 - i));
+			}
+			return backwards.toString();
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	fun reverseString(input: String): String {
+		val backwards = StringBuilder(input.length)
+		for (i in 0 until input.length) {
+			backwards.append(input[input.length - 1 - i])
+		}
+		return backwards.toString()
+	}
+----
+
+You can then register and use the preceding method, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+	context.setVariable("reverseString",
+			StringUtils.class.getDeclaredMethod("reverseString", String.class));
+
+	String helloWorldReversed = parser.parseExpression(
+			"#reverseString('hello')").getValue(context, String.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+
+	val context = SimpleEvaluationContext.forReadOnlyDataBinding().build()
+	context.setVariable("reverseString", ::reverseString::javaMethod)
+
+	val helloWorldReversed = parser.parseExpression(
+			"#reverseString('hello')").getValue(context, String::class.java)
+----
+
+
+
+[[expressions-bean-references]]
+=== Bean References
+
+If the evaluation context has been configured with a bean resolver, you can
+look up beans from an expression by using the `@` symbol. The following example shows how
+to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+	StandardEvaluationContext context = new StandardEvaluationContext();
+	context.setBeanResolver(new MyBeanResolver());
+
+	// This will end up calling resolve(context,"something") on MyBeanResolver during evaluation
+	Object bean = parser.parseExpression("@something").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+	val context = StandardEvaluationContext()
+	context.setBeanResolver(MyBeanResolver())
+
+	// This will end up calling resolve(context,"something") on MyBeanResolver during evaluation
+	val bean = parser.parseExpression("@something").getValue(context)
+----
+
+To access a factory bean itself, you should instead prefix the bean name with an `&` symbol.
+The following example shows how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+	StandardEvaluationContext context = new StandardEvaluationContext();
+	context.setBeanResolver(new MyBeanResolver());
+
+	// This will end up calling resolve(context,"&foo") on MyBeanResolver during evaluation
+	Object bean = parser.parseExpression("&foo").getValue(context);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+	val context = StandardEvaluationContext()
+	context.setBeanResolver(MyBeanResolver())
+
+	// This will end up calling resolve(context,"&foo") on MyBeanResolver during evaluation
+	val bean = parser.parseExpression("&foo").getValue(context)
+----
+
+
+[[expressions-operator-ternary]]
+=== Ternary Operator (If-Then-Else)
+
+You can use the ternary operator for performing if-then-else conditional logic inside
+the expression. The following listing shows a minimal example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	String falseString = parser.parseExpression(
+			"false ? 'trueExp' : 'falseExp'").getValue(String.class);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val falseString = parser.parseExpression(
+			"false ? 'trueExp' : 'falseExp'").getValue(String::class.java)
+----
+
+In this case, the boolean `false` results in returning the string value `'falseExp'`. A more
+realistic example follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	parser.parseExpression("Name").setValue(societyContext, "IEEE");
+	societyContext.setVariable("queryName", "Nikola Tesla");
+
+	expression = "isMember(#queryName)? #queryName + ' is a member of the ' " +
+			"+ Name + ' Society' : #queryName + ' is not a member of the ' + Name + ' Society'";
+
+	String queryResultString = parser.parseExpression(expression)
+			.getValue(societyContext, String.class);
+	// queryResultString = "Nikola Tesla is a member of the IEEE Society"
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	parser.parseExpression("Name").setValue(societyContext, "IEEE")
+	societyContext.setVariable("queryName", "Nikola Tesla")
+
+	expression = "isMember(#queryName)? #queryName + ' is a member of the ' " + "+ Name + ' Society' : #queryName + ' is not a member of the ' + Name + ' Society'"
+
+	val queryResultString = parser.parseExpression(expression)
+			.getValue(societyContext, String::class.java)
+	// queryResultString = "Nikola Tesla is a member of the IEEE Society"
+----
+
+See the next section on the Elvis operator for an even shorter syntax for the
+ternary operator.
+
+
+
+[[expressions-operator-elvis]]
+=== The Elvis Operator
+
+The Elvis operator is a shortening of the ternary operator syntax and is used in the
+http://www.groovy-lang.org/operators.html#_elvis_operator[Groovy] language.
+With the ternary operator syntax, you usually have to repeat a variable twice, as the
+following example shows:
+
+[source,groovy,indent=0,subs="verbatim,quotes"]
+----
+	String name = "Elvis Presley";
+	String displayName = (name != null ? name : "Unknown");
+----
+
+Instead, you can use the Elvis operator (named for the resemblance to Elvis' hair style).
+The following example shows how to use the Elvis operator:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+
+	String name = parser.parseExpression("name?:'Unknown'").getValue(String.class);
+	System.out.println(name);  // 'Unknown'
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+
+	val name = parser.parseExpression("name?:'Unknown'").getValue(String::class.java)
+	println(name)  // 'Unknown'
+----
+
+The following listing shows a more complex example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+
+	Inventor tesla = new Inventor("Nikola Tesla", "Serbian");
+	String name = parser.parseExpression("Name?:'Elvis Presley'").getValue(context, tesla, String.class);
+	System.out.println(name);  // Nikola Tesla
+
+	tesla.setName(null);
+	name = parser.parseExpression("Name?:'Elvis Presley'").getValue(context, tesla, String.class);
+	System.out.println(name);  // Elvis Presley
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+	val context = SimpleEvaluationContext.forReadOnlyDataBinding().build()
+
+	val tesla = Inventor("Nikola Tesla", "Serbian")
+	var name = parser.parseExpression("Name?:'Elvis Presley'").getValue(context, tesla, String::class.java)
+	println(name)  // Nikola Tesla
+
+	tesla.setName(null)
+	name = parser.parseExpression("Name?:'Elvis Presley'").getValue(context, tesla, String::class.java)
+	println(name)  // Elvis Presley
+----
+
+[NOTE]
+=====
+You can use the Elvis operator to apply default values in expressions. The following
+example shows how to use the Elvis operator in a `@Value` expression:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	@Value("#{systemProperties['pop3.port'] ?: 25}")
+----
+
+This will inject a system property `pop3.port` if it is defined or 25 if not.
+=====
+
+
+[[expressions-operator-safe-navigation]]
+=== Safe Navigation Operator
+
+The safe navigation operator is used to avoid a `NullPointerException` and comes from
+the http://www.groovy-lang.org/operators.html#_safe_navigation_operator[Groovy]
+language. Typically, when you have a reference to an object, you might need to verify that
+it is not null before accessing methods or properties of the object. To avoid this, the
+safe navigation operator returns null instead of throwing an exception. The following
+example shows how to use the safe navigation operator:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	ExpressionParser parser = new SpelExpressionParser();
+	EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+
+	Inventor tesla = new Inventor("Nikola Tesla", "Serbian");
+	tesla.setPlaceOfBirth(new PlaceOfBirth("Smiljan"));
+
+	String city = parser.parseExpression("PlaceOfBirth?.City").getValue(context, tesla, String.class);
+	System.out.println(city);  // Smiljan
+
+	tesla.setPlaceOfBirth(null);
+	city = parser.parseExpression("PlaceOfBirth?.City").getValue(context, tesla, String.class);
+	System.out.println(city);  // null - does not throw NullPointerException!!!
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val parser = SpelExpressionParser()
+	val context = SimpleEvaluationContext.forReadOnlyDataBinding().build()
+
+	val tesla = Inventor("Nikola Tesla", "Serbian")
+	tesla.setPlaceOfBirth(PlaceOfBirth("Smiljan"))
+
+	var city = parser.parseExpression("PlaceOfBirth?.City").getValue(context, tesla, String::class.java)
+	println(city)  // Smiljan
+
+	tesla.setPlaceOfBirth(null)
+	city = parser.parseExpression("PlaceOfBirth?.City").getValue(context, tesla, String::class.java)
+	println(city)  // null - does not throw NullPointerException!!!
+----
+
+
+
+[[expressions-collection-selection]]
+=== Collection Selection
+
+Selection is a powerful expression language feature that lets you transform a
+source collection into another collection by selecting from its entries.
+
+Selection uses a syntax of `.?[selectionExpression]`. It filters the collection and
+returns a new collection that contain a subset of the original elements. For example,
+selection lets us easily get a list of Serbian inventors, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	List<Inventor> list = (List<Inventor>) parser.parseExpression(
+			"Members.?[Nationality == 'Serbian']").getValue(societyContext);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val list = parser.parseExpression(
+			"Members.?[Nationality == 'Serbian']").getValue(societyContext) as List<Inventor>
+----
+
+Selection is possible upon both lists and maps. For a list, the selection
+criteria is evaluated against each individual list element. Against a map, the
+selection criteria is evaluated against each map entry (objects of the Java type
+`Map.Entry`). Each map entry has its key and value accessible as properties for use in
+the selection.
+
+The following expression returns a new map that consists of those elements of the original map
+where the entry value is less than 27:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Map newMap = parser.parseExpression("map.?[value<27]").getValue();
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val newMap = parser.parseExpression("map.?[value<27]").getValue()
+----
+
+
+In addition to returning all the selected elements, you can retrieve only the
+first or the last value. To obtain the first entry matching the selection, the syntax is
+`.^[selectionExpression]`. To obtain the last matching selection, the syntax is
+`.$[selectionExpression]`.
+
+
+
+[[expressions-collection-projection]]
+=== Collection Projection
+
+Projection lets a collection drive the evaluation of a sub-expression, and the
+result is a new collection. The syntax for projection is `.![projectionExpression]`. For
+example, suppose we have a list of inventors but want the list of
+cities where they were born. Effectively, we want to evaluate 'placeOfBirth.city' for
+every entry in the inventor list. The following example uses projection to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// returns ['Smiljan', 'Idvor' ]
+	List placesOfBirth = (List)parser.parseExpression("Members.![placeOfBirth.city]");
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// returns ['Smiljan', 'Idvor' ]
+	val placesOfBirth = parser.parseExpression("Members.![placeOfBirth.city]") as List<*>
+----
+
+You can also use a map to drive projection and, in this case, the projection expression is
+evaluated against each entry in the map (represented as a Java `Map.Entry`). The result
+of a projection across a map is a list that consists of the evaluation of the projection
+expression against each map entry.
+
+
+
+[[expressions-templating]]
+=== Expression templating
+
+Expression templates allow mixing literal text with one or more evaluation blocks.
+Each evaluation block is delimited with prefix and suffix characters that you can
+define. A common choice is to use `#{ }` as the delimiters, as the following example
+shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	String randomPhrase = parser.parseExpression(
+			"random number is #{T(java.lang.Math).random()}",
+			new TemplateParserContext()).getValue(String.class);
+
+	// evaluates to "random number is 0.7038186818312008"
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val randomPhrase = parser.parseExpression(
+			"random number is #{T(java.lang.Math).random()}",
+			TemplateParserContext()).getValue(String::class.java)
+
+	// evaluates to "random number is 0.7038186818312008"
+----
+
+The string is evaluated by concatenating the literal text `'random number is '` with the
+result of evaluating the expression inside the `#{ }` delimiter (in this case, the result
+of calling that `random()` method). The second argument to the `parseExpression()` method
+is of the type `ParserContext`. The `ParserContext` interface is used to influence how
+the expression is parsed in order to support the expression templating functionality.
+The definition of `TemplateParserContext` follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class TemplateParserContext implements ParserContext {
+
+		public String getExpressionPrefix() {
+			return "#{";
+		}
+
+		public String getExpressionSuffix() {
+			return "}";
+		}
+
+		public boolean isTemplate() {
+			return true;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class TemplateParserContext : ParserContext {
+
+		override fun getExpressionPrefix(): String {
+			return "#{"
+		}
+
+		override fun getExpressionSuffix(): String {
+			return "}"
+		}
+
+		override fun isTemplate(): Boolean {
+			return true
+		}
+	}
+----
+
+

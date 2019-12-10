@@ -1,0 +1,88 @@
+include::page$attributes.adoc[]
+[[rsocket-metadata-extractor]]
+== MetadataExtractor
+
+Responders must interpret metadata.
+{gh-rsocket-extentions}/CompositeMetadata.md[Composite metadata] allows independently
+formatted metadata values (e.g. for routing, security, tracing) each with its own mime
+type. Applications need a way to configure metadata mime types to support, and a way
+to access extracted values.
+
+`MetadataExtractor` is a contract to take serialized metadata and return decoded
+name-value pairs that can then be accessed like headers by name, for example via `@Header`
+in annotated handler methods.
+
+`DefaultMetadataExtractor` can be given `Decoder` instances to decode metadata. Out of
+the box it has built-in support for
+{gh-rsocket-extentions}/Routing.md["message/x.rsocket.routing.v0"] which it decodes to
+`String` and saves under the "route" key. For any other mime type you'll need to provide
+a `Decoder` and register the mime type as follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	DefaultMetadataExtractor extractor = new DefaultMetadataExtractor(metadataDecoders);
+	extractor.metadataToExtract(fooMimeType, Foo.class, "foo");
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.messaging.rsocket.metadataToExtract
+
+	val extractor = DefaultMetadataExtractor(metadataDecoders)
+	extractor.metadataToExtract<Foo>(fooMimeType, "foo")
+----
+
+Composite metadata works well to combine independent metadata values. However the
+requester might not support composite metadata, or may choose not to use it. For this,
+`DefaultMetadataExtractor` may needs custom logic to map the decoded value to the output
+map. Here is an example where JSON is used for metadata:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	DefaultMetadataExtractor extractor = new DefaultMetadataExtractor(metadataDecoders);
+	extractor.metadataToExtract(
+		MimeType.valueOf("application/vnd.myapp.metadata+json"),
+		new ParameterizedTypeReference<Map<String,String>>() {},
+		(jsonMap, outputMap) -> {
+			outputMap.putAll(jsonMap);
+		});
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.messaging.rsocket.metadataToExtract
+
+	val extractor = DefaultMetadataExtractor(metadataDecoders)
+	extractor.metadataToExtract<Map<String, String>>(MimeType.valueOf("application/vnd.myapp.metadata+json")) { jsonMap, outputMap ->
+		outputMap.putAll(jsonMap)
+	}
+----
+
+When configuring `MetadataExtractor` through `RSocketStrategies`, you can let
+`RSocketStrategies.Builder` create the extractor with the configured decoders, and
+simply use a callback to customize registrations as follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	RSocketStrategies strategies = RSocketStrategies.builder()
+		.metadataExtractorRegistry(registry -> {
+			registry.metadataToExtract(fooMimeType, Foo.class, "foo");
+			// ...
+		})
+		.build();
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.messaging.rsocket.metadataToExtract
+
+	val strategies = RSocketStrategies.builder()
+			.metadataExtractorRegistry { registry: MetadataExtractorRegistry ->
+				registry.metadataToExtract<Foo>(fooMimeType, "foo")
+				// ...
+			}
+			.build()
+----

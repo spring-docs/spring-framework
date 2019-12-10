@@ -1,0 +1,190 @@
+include::page$attributes.adoc[]
+[[scheduling-quartz]]
+=== Using the Quartz Scheduler
+
+Quartz uses `Trigger`, `Job`, and `JobDetail` objects to realize scheduling of all kinds
+of jobs. For the basic concepts behind Quartz, see
+https://www.quartz-scheduler.org/[]. For convenience purposes, Spring offers a couple of
+classes that simplify using Quartz within Spring-based applications.
+
+
+[[scheduling-quartz-jobdetail]]
+==== Using the `JobDetailFactoryBean`
+
+Quartz `JobDetail` objects contain all the information needed to run a job. Spring provides a
+`JobDetailFactoryBean`, which provides bean-style properties for XML configuration purposes.
+Consider the following example:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean name="exampleJob" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+		<property name="jobClass" value="example.ExampleJob"/>
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="timeout" value="5"/>
+			</map>
+		</property>
+	</bean>
+----
+
+The job detail configuration has all the information it needs to run the job (`ExampleJob`).
+The timeout is specified in the job data map. The job data map is available through the
+`JobExecutionContext` (passed to you at execution time), but the `JobDetail` also gets
+its properties from the job data mapped to properties of the job instance. So, in the following example,
+the `ExampleJob` contains a bean property named `timeout`, and the `JobDetail`
+has it applied automatically:
+
+[source,java,indent=0]
+[subs="verbatim"]
+----
+	package example;
+
+	public class ExampleJob extends QuartzJobBean {
+
+		private int timeout;
+
+		/**
+		 * Setter called after the ExampleJob is instantiated
+		 * with the value from the JobDetailFactoryBean (5)
+		 */
+		public void setTimeout(int timeout) {
+			this.timeout = timeout;
+		}
+
+		protected void executeInternal(JobExecutionContext ctx) throws JobExecutionException {
+			// do the actual work
+		}
+
+	}
+----
+
+All additional properties from the job data map are available to you as well.
+
+NOTE: By using the `name` and `group` properties, you can modify the name and the group
+of the job, respectively. By default, the name of the job matches the bean name
+of the `JobDetailFactoryBean` (`exampleJob` in the preceding example above).
+
+
+[[scheduling-quartz-method-invoking-job]]
+==== Using the `MethodInvokingJobDetailFactoryBean`
+
+Often you merely need to invoke a method on a specific object. By using the
+`MethodInvokingJobDetailFactoryBean`, you can do exactly this, as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="jobDetail" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="exampleBusinessObject"/>
+		<property name="targetMethod" value="doIt"/>
+	</bean>
+----
+
+The preceding example results in the `doIt` method being called on the
+`exampleBusinessObject` method, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class ExampleBusinessObject {
+
+		// properties and collaborators
+
+		public void doIt() {
+			// do the actual work
+		}
+	}
+----
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="exampleBusinessObject" class="examples.ExampleBusinessObject"/>
+----
+
+By using the `MethodInvokingJobDetailFactoryBean`, you need not create one-line jobs
+that merely invoke a method. You need only create the actual business object and
+wire up the detail object.
+
+By default, Quartz Jobs are stateless, resulting in the possibility of jobs interfering
+with each other. If you specify two triggers for the same `JobDetail`, it is
+possible that, before the first job has finished, the second one starts. If
+`JobDetail` classes implement the `Stateful` interface, this does not happen. The second
+job does not start before the first one has finished. To make jobs resulting from the
+`MethodInvokingJobDetailFactoryBean` be non-concurrent, set the `concurrent` flag to
+`false`, as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="jobDetail" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="exampleBusinessObject"/>
+		<property name="targetMethod" value="doIt"/>
+		<property name="concurrent" value="false"/>
+	</bean>
+----
+
+NOTE: By default, jobs will run in a concurrent fashion.
+
+
+[[scheduling-quartz-cron]]
+==== Wiring up Jobs by Using Triggers and `SchedulerFactoryBean`
+
+We have created job details and jobs. We have also reviewed the convenience bean that lets
+you invoke a method on a specific object. Of course, we still need to schedule the
+jobs themselves. This is done by using triggers and a `SchedulerFactoryBean`. Several
+triggers are available within Quartz, and Spring offers two Quartz `FactoryBean`
+implementations with convenient defaults: `CronTriggerFactoryBean` and
+`SimpleTriggerFactoryBean`.
+
+Triggers need to be scheduled. Spring offers a `SchedulerFactoryBean` that exposes
+triggers to be set as properties. `SchedulerFactoryBean` schedules the actual jobs with
+those triggers.
+
+The following listing uses both a `SimpleTriggerFactoryBean` and a `CronTriggerFactoryBean`:
+
+[source,xml,indent=0]
+[subs="verbatim"]
+----
+	<bean id="simpleTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerFactoryBean">
+		<!-- see the example of method invoking job above -->
+		<property name="jobDetail" ref="jobDetail"/>
+		<!-- 10 seconds -->
+		<property name="startDelay" value="10000"/>
+		<!-- repeat every 50 seconds -->
+		<property name="repeatInterval" value="50000"/>
+	</bean>
+
+	<bean id="cronTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="exampleJob"/>
+		<!-- run every morning at 6 AM -->
+		<property name="cronExpression" value="0 0 6 * * ?"/>
+	</bean>
+----
+
+The preceding example sets up two triggers, one running every 50 seconds with a starting delay of 10
+seconds and one running every morning at 6 AM. To finalize everything, we need to set up the
+`SchedulerFactoryBean`, as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="triggers">
+			<list>
+				<ref bean="cronTrigger"/>
+				<ref bean="simpleTrigger"/>
+			</list>
+		</property>
+	</bean>
+----
+
+More properties are available for the `SchedulerFactoryBean`, such as the calendars
+used by the job details, properties to customize Quartz with, and others. See the
+{api-spring-framework}/scheduling/quartz/SchedulerFactoryBean.html[`SchedulerFactoryBean`]
+javadoc for more information.
+
+
+
+

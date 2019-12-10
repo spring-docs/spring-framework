@@ -1,0 +1,271 @@
+include::page$attributes.adoc[]
+[[scheduling-annotation-support]]
+=== Annotation Support for Scheduling and Asynchronous Execution
+
+Spring provides annotation support for both task scheduling and asynchronous method
+execution.
+
+
+[[scheduling-enable-annotation-support]]
+==== Enable Scheduling Annotations
+
+To enable support for `@Scheduled` and `@Async` annotations, you can add `@EnableScheduling` and
+`@EnableAsync` to one of your `@Configuration` classes, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Configuration
+	@EnableAsync
+	@EnableScheduling
+	public class AppConfig {
+	}
+----
+
+You can pick and choose the relevant annotations for your application. For example,
+if you need only support for `@Scheduled`, you can omit `@EnableAsync`. For more
+fine-grained control, you can additionally implement the `SchedulingConfigurer`
+interface, the `AsyncConfigurer` interface, or both. See the
+{api-spring-framework}/scheduling/annotation/SchedulingConfigurer.html[`SchedulingConfigurer`]
+and {api-spring-framework}/scheduling/annotation/AsyncConfigurer.html[`AsyncConfigurer`]
+javadoc for full details.
+
+If you prefer XML configuration, you can use the `<task:annotation-driven>` element,
+as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:annotation-driven executor="myExecutor" scheduler="myScheduler"/>
+	<task:executor id="myExecutor" pool-size="5"/>
+	<task:scheduler id="myScheduler" pool-size="10"/>
+----
+
+Note that, with the preceding XML, an executor reference is provided for handling those
+tasks that correspond to methods with the `@Async` annotation, and the scheduler
+reference is provided for managing those methods annotated with `@Scheduled`.
+
+NOTE: The default advice mode for processing `@Async` annotations is `proxy` which allows
+for interception of calls through the proxy only. Local calls within the same class
+cannot get intercepted that way. For a more advanced mode of interception, consider
+switching to `aspectj` mode in combination with compile-time or load-time weaving.
+
+
+[[scheduling-annotation-support-scheduled]]
+==== The `@Scheduled` annotation
+
+You can add the `@Scheduled` annotation to a method, along with trigger metadata. For
+example, the following method is invoked every five seconds with a fixed delay,
+meaning that the period is measured from the completion time of each preceding
+invocation:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Scheduled(fixedDelay=5000)
+	public void doSomething() {
+		// something that should execute periodically
+	}
+----
+
+If you need a fixed-rate execution, you can change the property name specified within
+the annotation. The following method is invoked every five seconds (measured between the
+successive start times of each invocation):
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Scheduled(fixedRate=5000)
+	public void doSomething() {
+		// something that should execute periodically
+	}
+----
+
+For fixed-delay and fixed-rate tasks, you can specify an initial delay by indicating the
+number of milliseconds to wait before the first execution of the method, as the following
+`fixedRate` example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Scheduled(initialDelay=1000, fixedRate=5000)
+	public void doSomething() {
+		// something that should execute periodically
+	}
+----
+
+If simple periodic scheduling is not expressive enough, you can provide a cron expression.
+For example, the following executes only on weekdays:
+
+[source,java,indent=0]
+[subs="verbatim"]
+----
+	@Scheduled(cron="*/5 * * * * MON-FRI")
+	public void doSomething() {
+		// something that should execute on weekdays only
+	}
+----
+
+TIP: You can also use the `zone` attribute to specify the time zone in which the cron
+expression is resolved.
+
+Notice that the methods to be scheduled must have void returns and must not expect any
+arguments. If the method needs to interact with other objects from the application
+context, those would typically have been provided through dependency injection.
+
+[NOTE]
+====
+As of Spring Framework 4.3, `@Scheduled` methods are supported on beans of any scope.
+
+Make sure that you are not initializing multiple instances of the same `@Scheduled`
+annotation class at runtime, unless you do want to schedule callbacks to each such
+instance. Related to this, make sure that you do not use `@Configurable` on bean
+classes that are annotated with `@Scheduled` and registered as regular Spring beans
+with the container. Otherwise, you would get double initialization (once through the
+container and once through the `@Configurable` aspect), with the consequence of each
+`@Scheduled` method being invoked twice.
+====
+
+
+[[scheduling-annotation-support-async]]
+==== The `@Async` annotation
+
+You can provide the `@Async` annotation on a method so that invocation of that method
+occurs asynchronously. In other words, the caller returns immediately upon
+invocation, while the actual execution of the method occurs in a task that has been
+submitted to a Spring `TaskExecutor`. In the simplest case, you can apply the annotation
+to a method that returns `void`, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Async
+	void doSomething() {
+		// this will be executed asynchronously
+	}
+----
+
+Unlike the methods annotated with the `@Scheduled` annotation, these methods can expect
+arguments, because they are invoked in the "`normal`" way by callers at runtime rather
+than from a scheduled task being managed by the container. For example, the following code is
+a legitimate application of the `@Async` annotation:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Async
+	void doSomething(String s) {
+		// this will be executed asynchronously
+	}
+----
+
+Even methods that return a value can be invoked asynchronously. However, such methods
+are required to have a `Future`-typed return value. This still provides the benefit of
+asynchronous execution so that the caller can perform other tasks prior to calling
+`get()` on that `Future`. The following example shows how to use `@Async` on a method
+that returns a value:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Async
+	Future<String> returnSomething(int i) {
+		// this will be executed asynchronously
+	}
+----
+
+TIP: `@Async` methods may not only declare a regular `java.util.concurrent.Future` return type
+but also Spring's `org.springframework.util.concurrent.ListenableFuture` or, as of Spring
+4.2, JDK 8's `java.util.concurrent.CompletableFuture`, for richer interaction with the
+asynchronous task and for immediate composition with further processing steps.
+
+You can not use `@Async` in conjunction with lifecycle callbacks such as
+`@PostConstruct`. To asynchronously initialize Spring beans, you currently have to use
+a separate initializing Spring bean that then invokes the `@Async` annotated method on the
+target, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class SampleBeanImpl implements SampleBean {
+
+		@Async
+		void doSomething() {
+			// ...
+		}
+
+	}
+
+	public class SampleBeanInitializer {
+
+		private final SampleBean bean;
+
+		public SampleBeanInitializer(SampleBean bean) {
+			this.bean = bean;
+		}
+
+		@PostConstruct
+		public void initialize() {
+			bean.doSomething();
+		}
+
+	}
+----
+
+NOTE: There is no direct XML equivalent for `@Async`, since such methods should be designed
+for asynchronous execution in the first place, not externally re-declared to be asynchronous.
+However, you can manually set up Spring's `AsyncExecutionInterceptor` with Spring AOP,
+in combination with a custom pointcut.
+
+
+[[scheduling-annotation-support-qualification]]
+==== Executor Qualification with `@Async`
+
+By default, when specifying `@Async` on a method, the executor that is used is the
+one xref:scheduling:scheduling-annotation-support:scheduling-enable-annotation-support.adoc#scheduling-enable-annotation-support[configured when enabling async support],
+i.e. the "`annotation-driven`" element if you are using XML or your `AsyncConfigurer`
+implementation, if any. However, you can use the `value` attribute of the `@Async`
+annotation when you need to indicate that an executor other than the default should be
+used when executing a given method. The following example shows how to do so:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Async("otherExecutor")
+	void doSomething(String s) {
+		// this will be executed asynchronously by "otherExecutor"
+	}
+----
+
+In this case, `"otherExecutor"` can be the name of any `Executor` bean in the Spring
+container, or it may be the name of a qualifier associated with any `Executor` (for example, as
+specified with the `<qualifier>` element or Spring's `@Qualifier` annotation).
+
+
+[[scheduling-annotation-support-exception]]
+==== Exception Management with `@Async`
+
+When an `@Async` method has a `Future`-typed return value, it is easy to manage
+an exception that was thrown during the method execution, as this exception is
+thrown when calling `get` on the `Future` result. With a `void` return type,
+however, the exception is uncaught and cannot be transmitted. You can provide an
+`AsyncUncaughtExceptionHandler` to handle such exceptions. The following example shows
+how to do so:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyAsyncUncaughtExceptionHandler implements AsyncUncaughtExceptionHandler {
+
+		@Override
+		public void handleUncaughtException(Throwable ex, Method method, Object... params) {
+			// handle exception
+		}
+	}
+----
+
+By default, the exception is merely logged. You can define a custom `AsyncUncaughtExceptionHandler`
+by using `AsyncConfigurer` or the `<task:annotation-driven/>` XML element.
+
+
+

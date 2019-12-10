@@ -1,0 +1,13 @@
+include::page$attributes.adoc[]
+[[websocket]]
+= WebSockets
+:doc-spring-security: {doc-root}/spring-security/site/docs/current/reference
+[.small]#xref:webflux-websocket:webflux-websocket.adoc#webflux-websocket[WebFlux]#
+
+This part of the reference documentation covers support for Servlet stack, WebSocket
+messaging that includes raw WebSocket interactions, WebSocket emulation through SockJS, and
+publish-subscribe messaging through STOMP as a sub-protocol over WebSocket.
+
+
+
+

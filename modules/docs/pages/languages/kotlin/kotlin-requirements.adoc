@@ -1,0 +1,11 @@
+include::page$attributes.adoc[]
+[[kotlin-requirements]]
+== Requirements
+
+Spring Framework supports Kotlin 1.3 and requires
+https://bintray.com/bintray/jcenter/org.jetbrains.kotlin%3Akotlin-stdlib[`kotlin-stdlib`]
+(or one of its variants, such as https://bintray.com/bintray/jcenter/org.jetbrains.kotlin%3Akotlin-stdlib-jdk8[`kotlin-stdlib-jdk8`])
+and https://bintray.com/bintray/jcenter/org.jetbrains.kotlin%3Akotlin-reflect[`kotlin-reflect`]
+to be present on the classpath. They are provided by default if you bootstrap a Kotlin project on
+https://start.spring.io/#!language=kotlin&type=gradle-project[start.spring.io].
+

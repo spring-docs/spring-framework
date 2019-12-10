@@ -1,0 +1,169 @@
+include::page$attributes.adoc[]
+[[scheduling-task-namespace]]
+=== The `task` Namespace
+
+As of version 3.0, Spring includes an XML namespace for configuring `TaskExecutor` and
+`TaskScheduler` instances. It also provides a convenient way to configure tasks to be
+scheduled with a trigger.
+
+
+[[scheduling-task-namespace-scheduler]]
+==== The 'scheduler' Element
+
+The following element creates a `ThreadPoolTaskScheduler` instance with the
+specified thread pool size:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:scheduler id="scheduler" pool-size="10"/>
+----
+
+The value provided for the `id` attribute is used as the prefix for thread names
+within the pool. The `scheduler` element is relatively straightforward. If you do not
+provide a `pool-size` attribute, the default thread pool has only a single thread.
+There are no other configuration options for the scheduler.
+
+
+[[scheduling-task-namespace-executor]]
+==== The `executor` Element
+
+The following creates a `ThreadPoolTaskExecutor` instance:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:executor id="executor" pool-size="10"/>
+----
+
+As with the scheduler shown in the xref:scheduling:scheduling-task-namespace:scheduling-task-namespace-scheduler.adoc#scheduling-task-namespace-scheduler[previous section],
+the value provided for the `id` attribute is used as the prefix for thread names within
+the pool. As far as the pool size is concerned, the `executor` element supports more
+configuration options than the `scheduler` element. For one thing, the thread pool for
+a `ThreadPoolTaskExecutor` is itself more configurable. Rather than only a single size,
+an executor's thread pool can have different values for the core and the max size.
+If you provide a single value, the executor has a fixed-size thread pool (the core and
+max sizes are the same). However, the `executor` element's `pool-size` attribute also
+accepts a range in the form of `min-max`. The following example sets a minimum value of
+`5` and a maximum value of `25`:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:executor
+			id="executorWithPoolSizeRange"
+			pool-size="5-25"
+			queue-capacity="100"/>
+----
+
+In the preceding configuration, a `queue-capacity` value has also been provided.
+The configuration of the thread pool should also be considered in light of the
+executor's queue capacity. For the full description of the relationship between pool
+size and queue capacity, see the documentation for
+https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ThreadPoolExecutor.html[`ThreadPoolExecutor`].
+The main idea is that, when a task is submitted, the executor first tries to use a
+free thread if the number of active threads is currently less than the core size.
+If the core size has been reached, the task is added to the queue, as long as its
+capacity has not yet been reached. Only then, if the queue's capacity has been
+reached, does the executor create a new thread beyond the core size. If the max size
+has also been reached, then the executor rejects the task.
+
+By default, the queue is unbounded, but this is rarely the desired configuration,
+because it can lead to `OutOfMemoryErrors` if enough tasks are added to that queue while
+all pool threads are busy. Furthermore, if the queue is unbounded, the max size has
+no effect at all. Since the executor always tries the queue before creating a new
+thread beyond the core size, a queue must have a finite capacity for the thread pool to
+grow beyond the core size (this is why a fixed-size pool is the only sensible case
+when using an unbounded queue).
+
+Consider the case, as mentioned above, when a task is rejected. By default, when a
+task is rejected, a thread pool executor throws a `TaskRejectedException`. However,
+the rejection policy is actually configurable. The exception is thrown when using
+the default rejection policy, which is the `AbortPolicy` implementation.
+For applications where some tasks can be skipped under heavy load, you can instead
+configure either `DiscardPolicy` or `DiscardOldestPolicy`. Another option that works
+well for applications that need to throttle the submitted tasks under heavy load is
+the `CallerRunsPolicy`. Instead of throwing an exception or discarding tasks,
+that policy forces the thread that is calling the submit method to run the task itself.
+The idea is that such a caller is busy while running that task and not able to submit
+other tasks immediately. Therefore, it provides a simple way to throttle the incoming
+load while maintaining the limits of the thread pool and queue. Typically, this allows
+the executor to "`catch up`" on the tasks it is handling and thereby frees up some
+capacity on the queue, in the pool, or both. You can choose any of these options from an
+enumeration of values available for the `rejection-policy` attribute on the `executor`
+element.
+
+The following example shows an `executor` element with a number of attributes to specify
+various behaviors:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:executor
+			id="executorWithCallerRunsPolicy"
+			pool-size="5-25"
+			queue-capacity="100"
+			rejection-policy="CALLER_RUNS"/>
+----
+
+Finally, the `keep-alive` setting determines the time limit (in seconds) for which threads
+may remain idle before being terminated. If there are more than the core number of threads
+currently in the pool, after waiting this amount of time without processing a task, excess
+threads get terminated. A time value of zero causes excess threads to terminate
+immediately after executing a task without remaining follow-up work in the task queue.
+The following example sets the `keep-alive` value to two minutes:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:executor
+			id="executorWithKeepAlive"
+			pool-size="5-25"
+			keep-alive="120"/>
+----
+
+
+[[scheduling-task-namespace-scheduled-tasks]]
+==== The 'scheduled-tasks' Element
+
+The most powerful feature of Spring's task namespace is the support for configuring
+tasks to be scheduled within a Spring Application Context. This follows an approach
+similar to other "`method-invokers`" in Spring, such as that provided by the JMS namespace
+for configuring message-driven POJOs. Basically, a `ref` attribute can point to any
+Spring-managed object, and the `method` attribute provides the name of a method to be
+invoked on that object. The following listing shows a simple example:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<task:scheduled-tasks scheduler="myScheduler">
+		<task:scheduled ref="beanA" method="methodA" fixed-delay="5000"/>
+	</task:scheduled-tasks>
+
+	<task:scheduler id="myScheduler" pool-size="10"/>
+----
+
+The scheduler is referenced by the outer element, and each individual
+task includes the configuration of its trigger metadata. In the preceding example, that
+metadata defines a periodic trigger with a fixed delay indicating the number of
+milliseconds to wait after each task execution has completed. Another option is
+`fixed-rate`, indicating how often the method should be executed regardless of how long
+any previous execution takes. Additionally, for both `fixed-delay` and `fixed-rate` tasks, you can specify an
+'initial-delay' parameter, indicating the number of milliseconds to wait
+before the first execution of the method. For more control, you can instead provide a `cron` attribute.
+The following example shows these other options:
+
+[source,xml,indent=0]
+[subs="verbatim"]
+----
+	<task:scheduled-tasks scheduler="myScheduler">
+		<task:scheduled ref="beanA" method="methodA" fixed-delay="5000" initial-delay="1000"/>
+		<task:scheduled ref="beanB" method="methodB" fixed-rate="5000"/>
+		<task:scheduled ref="beanC" method="methodC" cron="*/5 * * * * MON-FRI"/>
+	</task:scheduled-tasks>
+
+	<task:scheduler id="myScheduler" pool-size="10"/>
+----
+
+
+

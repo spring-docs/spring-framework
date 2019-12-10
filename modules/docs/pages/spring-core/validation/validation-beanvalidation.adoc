@@ -1,0 +1,307 @@
+include::page$attributes.adoc[]
+[[validation-beanvalidation]]
+== Spring Validation
+
+Spring 3 introduced several enhancements to its validation support. First, the JSR-303
+Bean Validation API is fully supported. Second, when used programmatically, Spring's
+`DataBinder` can validate objects as well as bind to them. Third, Spring MVC has
+support for declaratively validating `@Controller` inputs.
+
+
+
+[[validation-beanvalidation-overview]]
+=== Overview of the JSR-303 Bean Validation API
+
+JSR-303 standardizes validation constraint declaration and metadata for the Java
+platform. By using this API, you annotate domain model properties with declarative
+validation constraints and the runtime enforces them. You can use a number of built-in
+constraints. You can also define your own custom constraints.
+
+Consider the following example, which shows a simple `PersonForm` model with two properties:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class PersonForm {
+		private String name;
+		private int age;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class PersonForm(
+			private val name: String,
+			private val age: Int
+	)
+----
+
+JSR-303 lets you define declarative validation constraints against such properties, as the
+following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class PersonForm {
+
+		@NotNull
+		@Size(max=64)
+		private String name;
+
+		@Min(0)
+		private int age;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class PersonForm(
+		@get:NotNull @get:Size(max=64)
+		private val name: String,
+		@get:Min(0)
+		private val age: Int
+	)
+----
+
+When a JSR-303 Validator validates an instance of this class, these constraints
+are enforced.
+
+For general information on JSR-303 and JSR-349, see the https://beanvalidation.org/[Bean
+Validation website]. For information on the specific capabilities of the default
+reference implementation, see the https://www.hibernate.org/412.html[Hibernate
+Validator] documentation. To learn how to set up a bean validation provider as a Spring
+bean, keep reading.
+
+
+
+[[validation-beanvalidation-spring]]
+=== Configuring a Bean Validation Provider
+
+Spring provides full support for the Bean Validation API. This includes convenient
+support for bootstrapping a JSR-303 or JSR-349 Bean Validation provider as a Spring bean.
+This lets you inject a `javax.validation.ValidatorFactory` or `javax.validation.Validator`
+wherever validation is needed in your application.
+
+You can use the `LocalValidatorFactoryBean` to configure a default Validator as a Spring bean,
+as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="validator"
+		class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean"/>
+----
+
+The basic configuration in the preceding example triggers bean validation to initialize by using its
+default bootstrap mechanism. A JSR-303 or JSR-349 provider, such as the Hibernate Validator,
+is expected to be present in the classpath and is automatically detected.
+
+
+[[validation-beanvalidation-spring-inject]]
+==== Injecting a Validator
+
+`LocalValidatorFactoryBean` implements both `javax.validation.ValidatorFactory` and
+`javax.validation.Validator`, as well as Spring's
+`org.springframework.validation.Validator`. You can inject a reference to either of
+these interfaces into beans that need to invoke validation logic.
+
+You can inject a reference to `javax.validation.Validator` if you prefer to work with the Bean
+Validation API directly, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	import javax.validation.Validator;
+
+	@Service
+	public class MyService {
+
+		@Autowired
+		private Validator validator;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import javax.validation.Validator;
+
+	@Service
+	class MyService(@Autowired private val validator: Validator)
+----
+
+You can inject a reference to `org.springframework.validation.Validator` if your bean requires
+the Spring Validation API, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	import org.springframework.validation.Validator;
+
+	@Service
+	public class MyService {
+
+		@Autowired
+		private Validator validator;
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import org.springframework.validation.Validator
+
+	@Service
+	class MyService(@Autowired private val validator: Validator)
+----
+
+
+[[validation-beanvalidation-spring-constraints]]
+==== Configuring Custom Constraints
+
+Each bean validation constraint consists of two parts:
+* A `@Constraint` annotation
+that declares the constraint and its configurable properties.
+* An implementation
+of the `javax.validation.ConstraintValidator` interface that implements the constraint's
+behavior.
+
+To associate a declaration with an implementation, each `@Constraint` annotation
+references a corresponding `ConstraintValidator` implementation class. At runtime, a
+`ConstraintValidatorFactory` instantiates the referenced implementation when the
+constraint annotation is encountered in your domain model.
+
+By default, the `LocalValidatorFactoryBean` configures a `SpringConstraintValidatorFactory`
+that uses Spring to create `ConstraintValidator` instances. This lets your custom
+`ConstraintValidators` benefit from dependency injection like any other Spring bean.
+
+The following example shows a custom `@Constraint` declaration followed by an associated
+`ConstraintValidator` implementation that uses Spring for dependency injection:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Target({ElementType.METHOD, ElementType.FIELD})
+	@Retention(RetentionPolicy.RUNTIME)
+	@Constraint(validatedBy=MyConstraintValidator.class)
+	public @interface MyConstraint {
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Target(AnnotationTarget.FUNCTION, AnnotationTarget.FIELD)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Constraint(validatedBy = MyConstraintValidator::class)
+	annotation class MyConstraint
+----
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	import javax.validation.ConstraintValidator;
+
+	public class MyConstraintValidator implements ConstraintValidator {
+
+		@Autowired;
+		private Foo aDependency;
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	import javax.validation.ConstraintValidator
+
+	class MyConstraintValidator(private val aDependency: Foo) : ConstraintValidator {
+
+		// ...
+	}
+----
+
+
+As the preceding example shows, a `ConstraintValidator` implementation can have its dependencies
+`@Autowired` as any other Spring bean.
+
+
+[[validation-beanvalidation-spring-method]]
+==== Spring-driven Method Validation
+
+You can integrate the method validation feature supported by Bean Validation 1.1 (and, as a custom
+extension, also by Hibernate Validator 4.3) into a Spring context
+through a `MethodValidationPostProcessor` bean definition, as follows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean class="org.springframework.validation.beanvalidation.MethodValidationPostProcessor"/>
+----
+
+To be eligible for Spring-driven method validation, all target classes need to be annotated with
+Spring's `@Validated` annotation. (Optionally, you can also declare the validation groups to use.)
+See the {api-spring-framework}/validation/beanvalidation/MethodValidationPostProcessor.html[`MethodValidationPostProcessor`]
+javadoc for setup details with the Hibernate Validator and Bean Validation 1.1 providers.
+
+
+[[validation-beanvalidation-spring-other]]
+==== Additional Configuration Options
+
+The default `LocalValidatorFactoryBean` configuration suffices for most
+cases. There are a number of configuration options for various Bean Validation
+constructs, from message interpolation to traversal resolution. See the
+{api-spring-framework}/validation/beanvalidation/LocalValidatorFactoryBean.html[`LocalValidatorFactoryBean`]
+javadoc for more information on these options.
+
+
+
+[[validation-binder]]
+=== Configuring a `DataBinder`
+
+Since Spring 3, you can configure a `DataBinder` instance with a `Validator`. Once
+configured, you can invoke the `Validator` by calling `binder.validate()`. Any validation
+`Errors` are automatically added to the binder's `BindingResult`.
+
+The following example shows how to use a `DataBinder` programmatically to invoke validation
+logic after binding to a target object:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Foo target = new Foo();
+	DataBinder binder = new DataBinder(target);
+	binder.setValidator(new FooValidator());
+
+	// bind to the target object
+	binder.bind(propertyValues);
+
+	// validate the target object
+	binder.validate();
+
+	// get BindingResult that includes any validation errors
+	BindingResult results = binder.getBindingResult();
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val target = Foo()
+	val binder = DataBinder(target)
+	binder.validator = FooValidator()
+
+	// bind to the target object
+	binder.bind(propertyValues)
+
+	// validate the target object
+	binder.validate()
+
+	// get BindingResult that includes any validation errors
+	val results = binder.bindingResult
+----
+
+You can also configure a `DataBinder` with multiple `Validator` instances through
+`dataBinder.addValidators` and `dataBinder.replaceValidators`. This is useful when
+combining globally configured bean validation with a Spring `Validator` configured
+locally on a DataBinder instance. See <<validation-mvc-configuring>>.
+
+
+
+[[validation-mvc]]
+=== Spring MVC 3 Validation
+
+See xref:mvc:mvc-config:mvc-config-validation.adoc#mvc-config-validation[Validation] in the Spring MVC chapter.

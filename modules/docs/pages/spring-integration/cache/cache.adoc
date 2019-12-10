@@ -1,0 +1,14 @@
+include::page$attributes.adoc[]
+[[cache]]
+== Cache Abstraction
+
+Since version 3.1, the Spring Framework provides support for transparently adding caching to
+an existing Spring application. Similar to the xref:transaction:transaction.adoc#transaction[transaction]
+support, the caching abstraction allows consistent use of various caching solutions with
+minimal impact on the code.
+
+As from Spring 4.1, the cache abstraction has been significantly extended with the
+support of xref:cache:cache-jsr-107.adoc#cache-jsr-107[JSR-107 annotations] and more customization options.
+
+
+

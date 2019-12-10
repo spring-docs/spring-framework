@@ -1,0 +1,68 @@
+include::page$attributes.adoc[]
+[[oxm-xstream]]
+=== XStream
+
+XStream is a simple library to serialize objects to XML and back again. It does not
+require any mapping and generates clean XML.
+
+For more information on XStream, see the https://x-stream.github.io/[XStream
+web site]. The Spring integration classes reside in the
+`org.springframework.oxm.xstream` package.
+
+
+[[oxm-xstream-marshaller]]
+==== Using `XStreamMarshaller`
+
+The `XStreamMarshaller` does not require any configuration and can be configured in an
+application context directly. To further customize the XML, you can set an alias map,
+which consists of string aliases mapped to classes, as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="xstreamMarshaller" class="org.springframework.oxm.xstream.XStreamMarshaller">
+			<property name="aliases">
+				<props>
+					<prop key="Flight">org.springframework.oxm.xstream.Flight</prop>
+				</props>
+			</property>
+		</bean>
+		...
+	</beans>
+----
+
+[WARNING]
+=====
+By default, XStream lets arbitrary classes be unmarshalled, which can lead to
+unsafe Java serialization effects. As such, we do not recommend using the
+`XStreamMarshaller` to unmarshal XML from external sources (that is, the Web), as this can
+result in security vulnerabilities.
+
+If you choose to use the `XStreamMarshaller` to unmarshal XML from an external source,
+set the `supportedClasses` property on the `XStreamMarshaller`, as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="xstreamMarshaller" class="org.springframework.oxm.xstream.XStreamMarshaller">
+		<property name="supportedClasses" value="org.springframework.oxm.xstream.Flight"/>
+		...
+	</bean>
+----
+
+Doing so ensures that only the registered classes are eligible for unmarshalling.
+
+Additionally, you can register
+{api-spring-framework}/oxm/xstream/XStreamMarshaller.html#setConverters(com.thoughtworks.xstream.converters.ConverterMatcher...)[custom
+converters] to make sure that only your supported classes can be unmarshalled. You might
+want to add a `CatchAllConverter` as the last converter in the list, in addition to
+converters that explicitly support the domain classes that should be supported. As a
+result, default XStream converters with lower priorities and possible security
+vulnerabilities do not get invoked.
+=====
+
+NOTE: Note that XStream is an XML serialization library, not a data binding library.
+Therefore, it has limited namespace support. As a result, it is rather unsuitable for usage
+within Web services.
+
+
+

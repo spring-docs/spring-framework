@@ -1,0 +1,18 @@
+include::page$attributes.adoc[]
+[[resources]]
+= Resources
+
+This chapter covers how Spring handles resources and how you can work with resources in
+Spring. It includes the following topics:
+
+* xref:resources:resources-introduction.adoc#resources-introduction[resources-introduction]
+* xref:resources:resources-resource.adoc#resources-resource[resources-resource]
+* xref:resources:resources-implementations.adoc#resources-implementations[resources-implementations]
+* xref:resources:resources-resourceloader.adoc#resources-resourceloader[resources-resourceloader]
+* xref:resources:resources-resourceloaderaware.adoc#resources-resourceloaderaware[resources-resourceloaderaware]
+* xref:resources:resources-as-dependencies.adoc#resources-as-dependencies[resources-as-dependencies]
+* xref:resources:resources-app-ctx.adoc#resources-app-ctx[resources-app-ctx]
+
+
+
+

@@ -1,0 +1,6 @@
+include::page$attributes.adoc[]
+[[oxm]]
+== Marshalling XML by Using Object-XML Mappers
+
+
+

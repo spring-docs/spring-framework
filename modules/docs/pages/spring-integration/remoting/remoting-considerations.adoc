@@ -1,0 +1,40 @@
+include::page$attributes.adoc[]
+[[remoting-considerations]]
+=== Considerations when Choosing a Technology
+
+Each and every technology presented here has its drawbacks. When choosing a technology,
+you should carefully consider your needs, the services you expose, and the objects you
+send over the wire.
+
+When using RMI, you cannot access the objects through the HTTP protocol,
+unless you tunnel the RMI traffic. RMI is a fairly heavy-weight protocol, in that it
+supports full-object serialization, which is important when you use a complex data model
+that needs serialization over the wire. However, RMI-JRMP is tied to Java clients. It is
+a Java-to-Java remoting solution.
+
+Spring's HTTP invoker is a good choice if you need HTTP-based remoting but also rely on
+Java serialization. It shares the basic infrastructure with RMI invokers but uses
+HTTP as transport. Note that HTTP invokers are not limited only to Java-to-Java remoting
+but also to Spring on both the client and the server side. (The latter also applies to
+Spring's RMI invoker for non-RMI interfaces.)
+
+Hessian might provide significant value when operating in a heterogeneous environment,
+because they explicitly allow for non-Java clients. However, non-Java support is still
+limited. Known issues include the serialization of Hibernate objects in combination with
+lazily-initialized collections. If you have such a data model, consider using RMI or
+HTTP invokers instead of Hessian.
+
+JMS can be useful for providing clusters of services and letting the JMS broker take
+care of load balancing, discovery, and auto-failover. By default, Java serialization is
+used for JMS remoting, but the JMS provider could use a different mechanism for
+the wire formatting, such as XStream to let servers be implemented in other
+technologies.
+
+Last but not least, EJB has an advantage over RMI, in that it supports standard
+role-based authentication and authorization and remote transaction propagation. It is
+possible to get RMI invokers or HTTP invokers to support security context propagation as
+well, although this is not provided by core Spring. Spring offers only appropriate hooks
+for plugging in third-party or custom solutions.
+
+
+

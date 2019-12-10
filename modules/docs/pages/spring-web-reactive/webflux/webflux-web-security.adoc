@@ -1,0 +1,17 @@
+include::page$attributes.adoc[]
+[[webflux-web-security]]
+== Web Security
+[.small]#xref:mvc:mvc-web-security.adoc#mvc-web-security[Web MVC]#
+
+The https://projects.spring.io/spring-security/[Spring Security] project provides support
+for protecting web applications from malicious exploits. See the Spring Security
+reference documentation, including:
+
+* {doc-spring-security}/html5/#jc-webflux[WebFlux Security]
+* {doc-spring-security}/html5/#test-webflux[WebFlux Testing Support]
+* {doc-spring-security}/html5/#csrf[CSRF Protection]
+* {doc-spring-security}/html5/#headers[Security Response Headers]
+
+
+
+

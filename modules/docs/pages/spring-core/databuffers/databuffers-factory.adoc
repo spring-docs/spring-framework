@@ -1,0 +1,19 @@
+include::page$attributes.adoc[]
+[[databuffers-factory]]
+== `DataBufferFactory`
+
+`DataBufferFactory` is used to create data buffers in one of two ways:
+
+. Allocate a new data buffer, optionally specifying capacity upfront, if known, which is
+more efficient even though implementations of `DataBuffer` can grow and shrink on demand.
+. Wrap an existing `byte[]` or `java.nio.ByteBuffer`, which decorates the given data with
+a `DataBuffer` implementation and that does not involve allocation.
+
+Note that WebFlux applications do not create a `DataBufferFactory` directly but instead
+access it through the `ServerHttpResponse` or the `ClientHttpRequest` on the client side.
+The type of factory depends on the underlying client or server, e.g.
+`NettyDataBufferFactory` for Reactor Netty, `DefaultDataBufferFactory` for others.
+
+
+
+

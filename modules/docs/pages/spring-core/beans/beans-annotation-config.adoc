@@ -1,0 +1,1669 @@
+include::page$attributes.adoc[]
+[[beans-annotation-config]]
+== Annotation-based Container Configuration
+
+.Are annotations better than XML for configuring Spring?
+****
+The introduction of annotation-based configuration raised the question of whether this
+approach is "`better`" than XML. The short answer is "`it depends.`" The long answer is
+that each approach has its pros and cons, and, usually, it is up to the developer to
+decide which strategy suits them better. Due to the way they are defined, annotations
+provide a lot of context in their declaration, leading to shorter and more concise
+configuration. However, XML excels at wiring up components without touching their source
+code or recompiling them. Some developers prefer having the wiring close to the source
+while others argue that annotated classes are no longer POJOs and, furthermore, that the
+configuration becomes decentralized and harder to control.
+
+No matter the choice, Spring can accommodate both styles and even mix them together.
+It is worth pointing out that through its xref:beans:beans-java.adoc#beans-java[JavaConfig] option, Spring lets
+annotations be used in a non-invasive way, without touching the target components
+source code and that, in terms of tooling, all configuration styles are supported by the
+https://spring.io/tools/sts[Spring Tool Suite].
+****
+
+An alternative to XML setup is provided by annotation-based configuration, which relies on
+the bytecode metadata for wiring up components instead of angle-bracket declarations.
+Instead of using XML to describe a bean wiring, the developer moves the configuration
+into the component class itself by using annotations on the relevant class, method, or
+field declaration. As mentioned in xref:beans:beans-factory-extension:beans-factory-extension-bpp.adoc#beans-factory-extension-bpp-examples-rabpp[beans-factory-extension-bpp-examples-rabpp], using
+a `BeanPostProcessor` in conjunction with annotations is a common means of extending the
+Spring IoC container. For example, Spring 2.0 introduced the possibility of enforcing
+required properties with the xref:beans:beans-annotation-config:beans-required-annotation.adoc#beans-required-annotation[`@Required`] annotation. Spring
+2.5 made it possible to follow that same general approach to drive Spring's dependency
+injection. Essentially, the `@Autowired` annotation provides the same capabilities as
+described in xref:beans:beans-dependencies:beans-factory-autowire.adoc#beans-factory-autowire[beans-factory-autowire] but with more fine-grained control and wider
+applicability. Spring 2.5 also added support for JSR-250 annotations, such as
+`@PostConstruct` and `@PreDestroy`. Spring 3.0 added support for JSR-330 (Dependency
+Injection for Java) annotations contained in the `javax.inject` package such as `@Inject`
+and `@Named`. Details about those annotations can be found in the
+xref:beans:beans-standard-annotations.adoc#beans-standard-annotations[relevant section].
+
+[NOTE]
+====
+Annotation injection is performed before XML injection. Thus, the XML configuration
+overrides the annotations for properties wired through both approaches.
+====
+
+As always, you can register them as individual bean definitions, but they can also be
+implicitly registered by including the following tag in an XML-based Spring
+configuration (notice the inclusion of the `context` namespace):
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/context
+			https://www.springframework.org/schema/context/spring-context.xsd">
+
+		<context:annotation-config/>
+
+	</beans>
+----
+
+(The implicitly registered post-processors include
+{api-spring-framework}/beans/factory/annotation/AutowiredAnnotationBeanPostProcessor.html[`AutowiredAnnotationBeanPostProcessor`],
+{api-spring-framework}/context/annotation/CommonAnnotationBeanPostProcessor.html[`CommonAnnotationBeanPostProcessor`],
+{api-spring-framework}/orm/jpa/support/PersistenceAnnotationBeanPostProcessor.html[`PersistenceAnnotationBeanPostProcessor`],
+and the aforementioned
+{api-spring-framework}/beans/factory/annotation/RequiredAnnotationBeanPostProcessor.html[`RequiredAnnotationBeanPostProcessor`].)
+
+[NOTE]
+====
+`<context:annotation-config/>` only looks for annotations on beans in the same
+application context in which it is defined. This means that, if you put
+`<context:annotation-config/>` in a `WebApplicationContext` for a `DispatcherServlet`,
+it only checks for `@Autowired` beans in your controllers, and not your services. See
+xref:mvc:mvc-servlet.adoc#mvc-servlet[The DispatcherServlet] for more information.
+====
+
+
+
+[[beans-required-annotation]]
+=== @Required
+
+The `@Required` annotation applies to bean property setter methods, as in the following
+example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		private MovieFinder movieFinder;
+
+		@Required
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class SimpleMovieLister {
+
+	@Required
+	lateinit var movieFinder: MovieFinder
+
+	// ...
+}
+----
+
+
+This annotation indicates that the affected bean property must be populated at
+configuration time, through an explicit property value in a bean definition or through
+autowiring. The container throws an exception if the affected bean property has not been
+populated. This allows for eager and explicit failure, avoiding `NullPointerException`
+instances or the like later on. We still recommend that you put assertions into the
+bean class itself (for example, into an init method). Doing so enforces those required
+references and values even when you use the class outside of a container.
+
+[NOTE]
+====
+The `@Required` annotation is formally deprecated as of Spring Framework 5.1, in favor
+of using constructor injection for required settings (or a custom implementation of
+`InitializingBean.afterPropertiesSet()` along with bean property setter methods).
+====
+
+
+
+[[beans-autowired-annotation]]
+=== Using `@Autowired`
+
+[NOTE]
+====
+JSR 330's `@Inject` annotation can be used in place of Spring's `@Autowired` annotation in the
+examples included in this section. See xref:beans:beans-standard-annotations.adoc#beans-standard-annotations[here] for more details.
+====
+
+You can apply the `@Autowired` annotation to constructors, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private final CustomerPreferenceDao customerPreferenceDao;
+
+		@Autowired
+		public MovieRecommender(CustomerPreferenceDao customerPreferenceDao) {
+			this.customerPreferenceDao = customerPreferenceDao;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender @Autowired constructor(
+		private val customerPreferenceDao: CustomerPreferenceDao)
+----
+
+[NOTE]
+====
+As of Spring Framework 4.3, an `@Autowired` annotation on such a constructor is
+no longer necessary if the target bean defines only one constructor to begin with.
+However, if several constructors are available, at least one must be annotated 
+with `@Autowired` in order to instruct the container which one to use.
+====
+
+You can also apply the `@Autowired` annotation to _traditional_ setter methods,
+as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		private MovieFinder movieFinder;
+
+		@Autowired
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class SimpleMovieLister {
+
+		@Autowired
+		lateinit var movieFinder: MovieFinder
+
+		// ...
+
+	}
+----
+
+You can also apply the annotation to methods with arbitrary names and multiple
+arguments, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private MovieCatalog movieCatalog;
+
+		private CustomerPreferenceDao customerPreferenceDao;
+
+		@Autowired
+		public void prepare(MovieCatalog movieCatalog,
+				CustomerPreferenceDao customerPreferenceDao) {
+			this.movieCatalog = movieCatalog;
+			this.customerPreferenceDao = customerPreferenceDao;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		private lateinit var movieCatalog: MovieCatalog
+
+		private lateinit var customerPreferenceDao: CustomerPreferenceDao
+
+		@Autowired
+		fun prepare(movieCatalog: MovieCatalog,
+					customerPreferenceDao: CustomerPreferenceDao) {
+			this.movieCatalog = movieCatalog
+			this.customerPreferenceDao = customerPreferenceDao
+		}
+
+		// ...
+	}
+----
+
+You can apply `@Autowired` to fields as well and even mix it with constructors, as the
+following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private final CustomerPreferenceDao customerPreferenceDao;
+
+		@Autowired
+		private MovieCatalog movieCatalog;
+
+		@Autowired
+		public MovieRecommender(CustomerPreferenceDao customerPreferenceDao) {
+			this.customerPreferenceDao = customerPreferenceDao;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender @Autowired constructor(
+		private val customerPreferenceDao: CustomerPreferenceDao) {
+
+		@Autowired
+		private lateinit var movieCatalog: MovieCatalog
+
+		// ...
+	}
+----
+
+[TIP]
+====
+Make sure that your target components (for example, `MovieCatalog` or `CustomerPreferenceDao`)
+are consistently declared by the type that you use for your `@Autowired`-annotated
+injection points. Otherwise, injection may fail due to a "no type match found" error at runtime.
+
+For XML-defined beans or component classes found via classpath scanning, the container
+usually knows the concrete type up front. However, for `@Bean` factory methods, you need
+to make sure that the declared return type is sufficiently expressive. For components
+that implement several interfaces or for components potentially referred to by their
+implementation type, consider declaring the most specific return type on your factory
+method (at least as specific as required by the injection points referring to your bean).
+====
+
+You can also instruct Spring to provide all beans of a particular type from the
+`ApplicationContext` by adding the `@Autowired` annotation to a field or method that
+expects an array of that type, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		private MovieCatalog[] movieCatalogs;
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		private lateinit var movieCatalogs: Array<MovieCatalog>
+
+		// ...
+	}
+----
+
+The same applies for typed collections, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private Set<MovieCatalog> movieCatalogs;
+
+		@Autowired
+		public void setMovieCatalogs(Set<MovieCatalog> movieCatalogs) {
+			this.movieCatalogs = movieCatalogs;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		lateinit var movieCatalogs: Set<MovieCatalog>
+		
+		// ...
+	}
+----
+
+[TIP]
+====
+Your target beans can implement the `org.springframework.core.Ordered` interface or use
+the `@Order` or standard `@Priority` annotation if you want items in the array or list
+to be sorted in a specific order. Otherwise, their order follows the registration
+order of the corresponding target bean definitions in the container.
+
+You can declare the `@Order` annotation at the target class level and on `@Bean` methods,
+potentially for individual bean definitions (in case of multiple definitions that
+use the same bean class). `@Order` values may influence priorities at injection points,
+but be aware that they do not influence singleton startup order, which is an
+orthogonal concern determined by dependency relationships and `@DependsOn` declarations.
+
+Note that the standard `javax.annotation.Priority` annotation is not available at the
+`@Bean` level, since it cannot be declared on methods. Its semantics can be modeled
+through `@Order` values in combination with `@Primary` on a single bean for each type.
+====
+
+Even typed `Map` instances can be autowired as long as the expected key type is `String`.
+The map values contain all beans of the expected type, and the keys contain the
+corresponding bean names, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private Map<String, MovieCatalog> movieCatalogs;
+
+		@Autowired
+		public void setMovieCatalogs(Map<String, MovieCatalog> movieCatalogs) {
+			this.movieCatalogs = movieCatalogs;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		lateinit var movieCatalogs: Map<String, MovieCatalog>
+		
+		// ...
+	}
+----
+
+By default, autowiring fails when no matching candidate beans are available for a given
+injection point. In the case of a declared array, collection, or map, at least one
+matching element is expected.
+
+The default behavior is to treat annotated methods and fields as indicating required
+dependencies. You can change this behavior as demonstrated in the following example,
+enabling the framework to skip a non-satisfiable injection point through marking it as
+non-required (i.e., by setting the `required` attribute in `@Autowired` to `false`):
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		private MovieFinder movieFinder;
+
+		@Autowired(required = false)
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class SimpleMovieLister {
+
+		@Autowired(required = false)
+		var movieFinder: MovieFinder? = null
+
+		// ...
+	}
+----
+
+A non-required method will not be called at all if its dependency (or one of its
+dependencies, in case of multiple arguments) is not available. A non-required field will
+not get populated at all in such case, leaving its default value in place.
+
+Injected constructor and factory method arguments are a special case since the `required`
+attribute in `@Autowired` has a somewhat different meaning due to Spring's constructor
+resolution algorithm that may potentially deal with multiple constructors. Constructor
+and factory method arguments are effectively required by default but with a few special
+rules in a single-constructor scenario, such as multi-element injection points (arrays,
+collections, maps) resolving to empty instances if no matching beans are available. This
+allows for a common implementation pattern where all dependencies can be declared in a
+unique multi-argument constructor — for example, declared as a single public constructor
+without an `@Autowired` annotation.
+
+[NOTE]
+====
+Only one constructor of any given bean class may declare `@Autowired` with the `required`
+attribute set to `true`, indicating _the_ constructor to autowire when used as a Spring
+bean. Furthermore, if the `required` attribute is set to `true`, only a single
+constructor may be annotated with `@Autowired`. If multiple _non-required_ constructors
+declare the annotation, they will be considered as candidates for autowiring. The
+constructor with the greatest number of dependencies that can be satisfied by matching
+beans in the Spring container will be chosen. If none of the candidates can be satisfied,
+then a primary/default constructor (if present) will be used. If a class only declares a
+single constructor to begin with, it will always be used, even if not annotated. An
+annotated constructor does not have to be public.
+
+The `required` attribute of `@Autowired` is recommended over the deprecated `@Required`
+annotation on setter methods. Setting the `required` attribute to `false` indicates that
+the property is not required for autowiring purposes, and the property is ignored if it
+cannot be autowired. `@Required`, on the other hand, is stronger in that it enforces the
+property to be set by any means supported by the container, and if no value is defined, a
+corresponding exception is raised.
+====
+
+Alternatively, you can express the non-required nature of a particular dependency
+through Java 8's `java.util.Optional`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	public class SimpleMovieLister {
+
+		@Autowired
+		public void setMovieFinder(Optional<MovieFinder> movieFinder) {
+			...
+		}
+	}
+----
+
+As of Spring Framework 5.0, you can also use a `@Nullable` annotation (of any kind
+in any package -- for example, `javax.annotation.Nullable` from JSR-305) or just leverage
+Kotlin builtin null-safety support:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		@Autowired
+		public void setMovieFinder(@Nullable MovieFinder movieFinder) {
+			...
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class SimpleMovieLister {
+
+		@Autowired
+		var movieFinder: MovieFinder? = null
+
+		// ...
+	}
+----
+
+You can also use `@Autowired` for interfaces that are well-known resolvable
+dependencies: `BeanFactory`, `ApplicationContext`, `Environment`, `ResourceLoader`,
+`ApplicationEventPublisher`, and `MessageSource`. These interfaces and their extended
+interfaces, such as `ConfigurableApplicationContext` or `ResourcePatternResolver`, are
+automatically resolved, with no special setup necessary. The following example autowires
+an `ApplicationContext` object:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		private ApplicationContext context;
+
+		public MovieRecommender() {
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class MovieRecommender {
+
+	@Autowired
+	lateinit var context: ApplicationContext
+
+	// ...
+}
+----
+
+[NOTE]
+====
+The `@Autowired`, `@Inject`, `@Value`, and `@Resource` annotations are handled by Spring
+`BeanPostProcessor` implementations. This means that you cannot apply these annotations
+within your own `BeanPostProcessor` or `BeanFactoryPostProcessor` types (if any).
+These types must be 'wired up' explicitly by using XML or a Spring `@Bean` method.
+====
+
+
+
+[[beans-autowired-annotation-primary]]
+=== Fine-tuning Annotation-based Autowiring with `@Primary`
+
+Because autowiring by type may lead to multiple candidates, it is often necessary to have
+more control over the selection process. One way to accomplish this is with Spring's
+`@Primary` annotation. `@Primary` indicates that a particular bean should be given
+preference when multiple beans are candidates to be autowired to a single-valued
+dependency. If exactly one primary bean exists among the candidates, it becomes the
+autowired value.
+
+Consider the following configuration that defines `firstMovieCatalog` as the
+primary `MovieCatalog`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Configuration
+	public class MovieConfiguration {
+
+		@Bean
+		@Primary
+		public MovieCatalog firstMovieCatalog() { ... }
+
+		@Bean
+		public MovieCatalog secondMovieCatalog() { ... }
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class MovieConfiguration {
+
+		@Bean
+		@Primary
+		fun firstMovieCatalog(): MovieCatalog { ... }
+
+		@Bean
+		fun secondMovieCatalog(): MovieCatalog { ... }
+
+		// ...
+	}
+----
+
+With the preceding configuration, the following `MovieRecommender` is autowired with the
+`firstMovieCatalog`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		private MovieCatalog movieCatalog;
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class MovieRecommender {
+
+	@Autowired
+	private lateinit var movieCatalog: MovieCatalog
+
+	// ...
+}
+----
+
+The corresponding bean definitions follow:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/context
+			https://www.springframework.org/schema/context/spring-context.xsd">
+
+		<context:annotation-config/>
+
+		<bean class="example.SimpleMovieCatalog" primary="true">
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean id="movieRecommender" class="example.MovieRecommender"/>
+
+	</beans>
+----
+
+
+
+[[beans-autowired-annotation-qualifiers]]
+=== Fine-tuning Annotation-based Autowiring with Qualifiers
+
+`@Primary` is an effective way to use autowiring by type with several instances when one
+primary candidate can be determined. When you need more control over the selection process,
+you can use Spring's `@Qualifier` annotation. You can associate qualifier values
+with specific arguments, narrowing the set of type matches so that a specific bean is
+chosen for each argument. In the simplest case, this can be a plain descriptive value, as
+shown in the following example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		@Qualifier("main")
+		private MovieCatalog movieCatalog;
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		@Qualifier("main")
+		private lateinit var movieCatalog: MovieCatalog
+
+		// ...
+	}
+----
+
+You can also specify the `@Qualifier` annotation on individual constructor arguments or
+method parameters, as shown in the following example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		private MovieCatalog movieCatalog;
+
+		private CustomerPreferenceDao customerPreferenceDao;
+
+		@Autowired
+		public void prepare(@Qualifier("main") MovieCatalog movieCatalog,
+				CustomerPreferenceDao customerPreferenceDao) {
+			this.movieCatalog = movieCatalog;
+			this.customerPreferenceDao = customerPreferenceDao;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		private lateinit var movieCatalog: MovieCatalog
+
+		private lateinit var customerPreferenceDao: CustomerPreferenceDao
+
+		@Autowired
+		fun prepare(@Qualifier("main") movieCatalog: MovieCatalog,
+					customerPreferenceDao: CustomerPreferenceDao) {
+			this.movieCatalog = movieCatalog
+			this.customerPreferenceDao = customerPreferenceDao
+		}
+
+		// ...
+	}
+----
+
+The following example shows corresponding bean definitions.
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/context
+			https://www.springframework.org/schema/context/spring-context.xsd">
+
+		<context:annotation-config/>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier value="main"/> <1>
+
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier value="action"/> <2>
+
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean id="movieRecommender" class="example.MovieRecommender"/>
+
+	</beans>
+----
+<1> The bean with the `main` qualifier value is wired with the constructor argument that
+is qualified with the same value.
+<2> The bean with the `action` qualifier value is wired with the constructor argument that
+is qualified with the same value.
+====
+
+For a fallback match, the bean name is considered a default qualifier value. Thus, you
+can define the bean with an `id` of `main` instead of the nested qualifier element, leading
+to the same matching result. However, although you can use this convention to refer to
+specific beans by name, `@Autowired` is fundamentally about type-driven injection with
+optional semantic qualifiers. This means that qualifier values, even with the bean name
+fallback, always have narrowing semantics within the set of type matches. They do not
+semantically express a reference to a unique bean `id`. Good qualifier values are `main`
+or `EMEA` or `persistent`, expressing characteristics of a specific component that are
+independent from the bean `id`, which may be auto-generated in case of an anonymous bean
+definition such as the one in the preceding example.
+
+Qualifiers also apply to typed collections, as discussed earlier -- for example, to
+`Set<MovieCatalog>`. In this case, all matching beans, according to the declared
+qualifiers, are injected as a collection. This implies that qualifiers do not have to be
+unique. Rather, they constitute filtering criteria. For example, you can define
+multiple `MovieCatalog` beans with the same qualifier value "`action`", all of which are
+injected into a `Set<MovieCatalog>` annotated with `@Qualifier("action")`.
+
+[TIP]
+====
+Letting qualifier values select against target bean names, within the type-matching
+candidates, does not require a `@Qualifier` annotation at the injection point.
+If there is no other resolution indicator (such as a qualifier or a primary marker),
+for a non-unique dependency situation, Spring matches the injection point name
+(that is, the field name or parameter name) against the target bean names and choose the
+same-named candidate, if any.
+====
+
+That said, if you intend to express annotation-driven injection by name, do not
+primarily use `@Autowired`, even if it is capable of selecting by bean name among
+type-matching candidates. Instead, use the JSR-250 `@Resource` annotation, which is
+semantically defined to identify a specific target component by its unique name, with
+the declared type being irrelevant for the matching process. `@Autowired` has rather
+different semantics: After selecting candidate beans by type, the specified `String`
+qualifier value is considered within those type-selected candidates only (for example,
+matching an `account` qualifier against beans marked with the same qualifier label).
+
+For beans that are themselves defined as a collection, `Map`, or array type, `@Resource`
+is a fine solution, referring to the specific collection or array bean by unique name.
+That said, as of 4.3, collection, you can match `Map`, and array types through Spring's
+`@Autowired` type matching algorithm as well, as long as the element type information
+is preserved in `@Bean` return type signatures or collection inheritance hierarchies.
+In this case, you can use qualifier values to select among same-typed collections,
+as outlined in the previous paragraph.
+
+As of 4.3, `@Autowired` also considers self references for injection (that is, references
+back to the bean that is currently injected). Note that self injection is a fallback.
+Regular dependencies on other components always have precedence. In that sense, self
+references do not participate in regular candidate selection and are therefore in
+particular never primary. On the contrary, they always end up as lowest precedence.
+In practice, you should use self references as a last resort only (for example, for
+calling other methods on the same instance through the bean's transactional proxy).
+Consider factoring out the effected methods to a separate delegate bean in such a scenario.
+Alternatively, you can use `@Resource`, which may obtain a proxy back to the current bean
+by its unique name.
+
+[NOTE]
+====
+Trying to inject the results from `@Bean` methods on the same configuration class is
+effectively a self-reference scenario as well. Either lazily resolve such references
+in the method signature where it is actually needed (as opposed to an autowired field
+in the configuration class) or declare the affected `@Bean` methods as `static`,
+decoupling them from the containing configuration class instance and its lifecycle.
+Otherwise, such beans are only considered in the fallback phase, with matching beans
+on other configuration classes selected as primary candidates instead (if available).
+====
+
+`@Autowired` applies to fields, constructors, and multi-argument methods, allowing for
+narrowing through qualifier annotations at the parameter level. In contrast, `@Resource`
+is supported only for fields and bean property setter methods with a single argument.
+As a consequence, you should stick with qualifiers if your injection target is a
+constructor or a multi-argument method.
+
+You can create your own custom qualifier annotations. To do so, define an annotation and
+provide the `@Qualifier` annotation within your definition, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Target({ElementType.FIELD, ElementType.PARAMETER})
+	@Retention(RetentionPolicy.RUNTIME)
+	@Qualifier
+	public @interface Genre {
+
+		String value();
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Qualifier
+	annotation class Genre(val value: String)
+----
+
+Then you can provide the custom qualifier on autowired fields and parameters, as the
+following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		@Genre("Action")
+		private MovieCatalog actionCatalog;
+
+		private MovieCatalog comedyCatalog;
+
+		@Autowired
+		public void setComedyCatalog(@Genre("Comedy") MovieCatalog comedyCatalog) {
+			this.comedyCatalog = comedyCatalog;
+		}
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		@Genre("Action")
+		private lateinit var actionCatalog: MovieCatalog
+
+		private lateinit var comedyCatalog: MovieCatalog
+
+		@Autowired
+		fun setComedyCatalog(@Genre("Comedy") comedyCatalog: MovieCatalog) {
+			this.comedyCatalog = comedyCatalog
+		}
+
+		// ...
+	}
+----
+
+Next, you can provide the information for the candidate bean definitions. You can add
+`<qualifier/>` tags as sub-elements of the `<bean/>` tag and then specify the `type` and
+`value` to match your custom qualifier annotations. The type is matched against the
+fully-qualified class name of the annotation. Alternately, as a convenience if no risk of
+conflicting names exists, you can use the short class name. The following example
+demonstrates both approaches:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/context
+			https://www.springframework.org/schema/context/spring-context.xsd">
+
+		<context:annotation-config/>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier type="Genre" value="Action"/>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier type="example.Genre" value="Comedy"/>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean id="movieRecommender" class="example.MovieRecommender"/>
+
+	</beans>
+----
+
+In xref:beans:beans-classpath-scanning.adoc#beans-classpath-scanning[beans-classpath-scanning], you can see an annotation-based alternative to
+providing the qualifier metadata in XML. Specifically, see xref:beans:beans-classpath-scanning:beans-scanning-qualifiers.adoc#beans-scanning-qualifiers[beans-scanning-qualifiers].
+
+In some cases, using an annotation without a value may suffice. This can be
+useful when the annotation serves a more generic purpose and can be applied across
+several different types of dependencies. For example, you may provide an offline
+catalog that can be searched when no Internet connection is available. First, define
+the simple annotation, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Target({ElementType.FIELD, ElementType.PARAMETER})
+	@Retention(RetentionPolicy.RUNTIME)
+	@Qualifier
+	public @interface Offline {
+
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Qualifier
+	annotation class Offline
+----
+
+Then add the annotation to the field or property to be autowired, as shown in the
+following example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		@Offline // <1>
+		private MovieCatalog offlineCatalog;
+
+		// ...
+	}
+----
+<1> This line adds the `@Offline` annotation.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class MovieRecommender {
+
+	@Autowired
+	@Offline // <1>
+	private lateinit var offlineCatalog: MovieCatalog
+
+	// ...
+}
+----
+<1> This line adds the `@Offline` annotation.
+
+Now the bean definition only needs a qualifier `type`, as shown in the following example:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean class="example.SimpleMovieCatalog">
+		<qualifier type="Offline"/> <1>
+		<!-- inject any dependencies required by this bean -->
+	</bean>
+----
+<1> This element specifies the qualifier.
+
+
+You can also define custom qualifier annotations that accept named attributes in
+addition to or instead of the simple `value` attribute. If multiple attribute values are
+then specified on a field or parameter to be autowired, a bean definition must match
+all such attribute values to be considered an autowire candidate. As an example,
+consider the following annotation definition:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Target({ElementType.FIELD, ElementType.PARAMETER})
+	@Retention(RetentionPolicy.RUNTIME)
+	@Qualifier
+	public @interface MovieQualifier {
+
+		String genre();
+
+		Format format();
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Qualifier
+	annotation class MovieQualifier(val genre: String, val format: Format)
+----
+
+In this case `Format` is an enum, defined as follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public enum Format {
+		VHS, DVD, BLURAY
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	enum class Format {
+		VHS, DVD, BLURAY
+	}
+----
+
+The fields to be autowired are annotated with the custom qualifier and include values
+for both attributes: `genre` and `format`, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Autowired
+		@MovieQualifier(format=Format.VHS, genre="Action")
+		private MovieCatalog actionVhsCatalog;
+
+		@Autowired
+		@MovieQualifier(format=Format.VHS, genre="Comedy")
+		private MovieCatalog comedyVhsCatalog;
+
+		@Autowired
+		@MovieQualifier(format=Format.DVD, genre="Action")
+		private MovieCatalog actionDvdCatalog;
+
+		@Autowired
+		@MovieQualifier(format=Format.BLURAY, genre="Comedy")
+		private MovieCatalog comedyBluRayCatalog;
+
+		// ...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Autowired
+		@MovieQualifier(format = Format.VHS, genre = "Action")
+		private lateinit var actionVhsCatalog: MovieCatalog
+
+		@Autowired
+		@MovieQualifier(format = Format.VHS, genre = "Comedy")
+		private lateinit var comedyVhsCatalog: MovieCatalog
+
+		@Autowired
+		@MovieQualifier(format = Format.DVD, genre = "Action")
+		private lateinit var actionDvdCatalog: MovieCatalog
+
+		@Autowired
+		@MovieQualifier(format = Format.BLURAY, genre = "Comedy")
+		private lateinit var comedyBluRayCatalog: MovieCatalog
+
+		// ...
+	}
+----
+
+Finally, the bean definitions should contain matching qualifier values. This example
+also demonstrates that you can use bean meta attributes instead of the
+`<qualifier/>` elements. If available, the `<qualifier/>` element and its attributes take
+precedence, but the autowiring mechanism falls back on the values provided within the
+`<meta/>` tags if no such qualifier is present, as in the last two bean definitions in
+the following example:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/context
+			https://www.springframework.org/schema/context/spring-context.xsd">
+
+		<context:annotation-config/>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier type="MovieQualifier">
+				<attribute key="format" value="VHS"/>
+				<attribute key="genre" value="Action"/>
+			</qualifier>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<qualifier type="MovieQualifier">
+				<attribute key="format" value="VHS"/>
+				<attribute key="genre" value="Comedy"/>
+			</qualifier>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<meta key="format" value="DVD"/>
+			<meta key="genre" value="Action"/>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+		<bean class="example.SimpleMovieCatalog">
+			<meta key="format" value="BLURAY"/>
+			<meta key="genre" value="Comedy"/>
+			<!-- inject any dependencies required by this bean -->
+		</bean>
+
+	</beans>
+----
+
+
+
+[[beans-generics-as-qualifiers]]
+=== Using Generics as Autowiring Qualifiers
+
+In addition to the `@Qualifier` annotation, you can use Java generic types
+as an implicit form of qualification. For example, suppose you have the following
+configuration:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Configuration
+	public class MyConfiguration {
+
+		@Bean
+		public StringStore stringStore() {
+			return new StringStore();
+		}
+
+		@Bean
+		public IntegerStore integerStore() {
+			return new IntegerStore();
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class MyConfiguration {
+
+		@Bean
+		fun stringStore() = StringStore()
+			
+		@Bean
+		fun integerStore() = IntegerStore()
+	}
+----
+
+Assuming that the preceding beans implement a generic interface, (that is, `Store<String>` and
+`Store<Integer>`), you can `@Autowire` the `Store` interface and the generic is
+used as a qualifier, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Autowired
+	private Store<String> s1; // <String> qualifier, injects the stringStore bean
+
+	@Autowired
+	private Store<Integer> s2; // <Integer> qualifier, injects the integerStore bean
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Autowired
+	private lateinit var s1: Store<String> // <String> qualifier, injects the stringStore bean
+
+	@Autowired
+	private lateinit var s2: Store<Integer> // <Integer> qualifier, injects the integerStore bean
+----
+
+Generic qualifiers also apply when autowiring lists, `Map` instances and arrays. The
+following example autowires a generic `List`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// Inject all Store beans as long as they have an <Integer> generic
+	// Store<String> beans will not appear in this list
+	@Autowired
+	private List<Store<Integer>> s;
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// Inject all Store beans as long as they have an <Integer> generic
+	// Store<String> beans will not appear in this list
+	@Autowired
+	private lateinit var s: List<Store<Integer>>
+----
+
+
+
+[[beans-custom-autowire-configurer]]
+=== Using `CustomAutowireConfigurer`
+
+{api-spring-framework}/beans/factory/annotation/CustomAutowireConfigurer.html[`CustomAutowireConfigurer`]
+is a `BeanFactoryPostProcessor` that lets you register your own custom qualifier
+annotation types, even if they are not annotated with Spring's `@Qualifier` annotation.
+The following example shows how to use `CustomAutowireConfigurer`:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="customAutowireConfigurer"
+			class="org.springframework.beans.factory.annotation.CustomAutowireConfigurer">
+		<property name="customQualifierTypes">
+			<set>
+				<value>example.CustomQualifier</value>
+			</set>
+		</property>
+	</bean>
+----
+
+The `AutowireCandidateResolver` determines autowire candidates by:
+
+* The `autowire-candidate` value of each bean definition
+* Any `default-autowire-candidates` patterns available on the `<beans/>` element
+* The presence of `@Qualifier` annotations and any custom annotations registered
+with the `CustomAutowireConfigurer`
+
+When multiple beans qualify as autowire candidates, the determination of a "`primary`" is
+as follows: If exactly one bean definition among the candidates has a `primary`
+attribute set to `true`, it is selected.
+
+
+
+[[beans-resource-annotation]]
+=== Injection with `@Resource`
+
+Spring also supports injection by using the JSR-250 `@Resource` annotation
+(`javax.annotation.Resource`) on fields or bean property setter methods.
+This is a common pattern in Java EE: for example, in JSF-managed beans and JAX-WS
+endpoints. Spring supports this pattern for Spring-managed objects as well.
+
+`@Resource` takes a name attribute. By default, Spring interprets that value as
+the bean name to be injected. In other words, it follows by-name semantics,
+as demonstrated in the following example:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		private MovieFinder movieFinder;
+
+		@Resource(name="myMovieFinder") // <1>
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+	}
+----
+<1> This line injects a `@Resource`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class SimpleMovieLister {
+
+	@Resource(name="myMovieFinder") // <1>
+	private lateinit var movieFinder:MovieFinder
+}
+----
+<1> This line injects a `@Resource`.
+
+
+If no name is explicitly specified, the default name is derived from the field name or
+setter method. In case of a field, it takes the field name. In case of a setter method,
+it takes the bean property name. The following example is going to have the bean
+named `movieFinder` injected into its setter method:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		private MovieFinder movieFinder;
+
+		@Resource
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class SimpleMovieLister {
+
+		@Resource
+		private lateinit var movieFinder: MovieFinder
+		
+	}
+----
+
+NOTE: The name provided with the annotation is resolved as a bean name by the
+`ApplicationContext` of which the `CommonAnnotationBeanPostProcessor` is aware.
+The names can be resolved through JNDI if you configure Spring's
+{api-spring-framework}/jndi/support/SimpleJndiBeanFactory.html[`SimpleJndiBeanFactory`]
+explicitly. However, we recommend that you rely on the default behavior and
+use Spring's JNDI lookup capabilities to preserve the level of indirection.
+
+In the exclusive case of `@Resource` usage with no explicit name specified, and similar
+to `@Autowired`, `@Resource` finds a primary type match instead of a specific named bean
+and resolves well known resolvable dependencies: the `BeanFactory`,
+`ApplicationContext`, `ResourceLoader`, `ApplicationEventPublisher`, and `MessageSource`
+interfaces.
+
+Thus, in the following example, the `customerPreferenceDao` field first looks for a bean
+named "customerPreferenceDao" and then falls back to a primary type match for the type
+`CustomerPreferenceDao`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MovieRecommender {
+
+		@Resource
+		private CustomerPreferenceDao customerPreferenceDao;
+
+		@Resource
+		private ApplicationContext context; // <1>
+
+		public MovieRecommender() {
+		}
+
+		// ...
+	}
+----
+<1> The `context` field is injected based on the known resolvable dependency type:
+`ApplicationContext`.
+
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MovieRecommender {
+
+		@Resource
+		private lateinit var customerPreferenceDao: CustomerPreferenceDao
+
+
+		@Resource
+		private lateinit var context: ApplicationContext // <1>
+
+		// ...
+	}
+----
+<1> The `context` field is injected based on the known resolvable dependency type:
+`ApplicationContext`.
+
+[[beans-value-annotations]]
+=== Using `@Value`
+
+`@Value` is typically used to inject externalized properties:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Component
+    public class MovieRecommender {
+
+        private final String catalog;
+
+        public MovieRecommender(@Value("${catalog.name}") String catalog) {
+            this.catalog = catalog;
+        }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Component
+	class MovieRecommender(@Value("\${catalog.name}") private val catalog: String)
+----
+
+With the following configuration:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Configuration
+    @PropertySource("classpath:application.properties")
+    public class AppConfig { }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	@PropertySource("classpath:application.properties")
+	class AppConfig
+----
+
+And the following `application.properties` file:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    catalog.name=MovieCatalog
+----
+
+In that case, the `catalog` parameter and field will be equal to the `MovieCatalog` value.
+
+A default lenient embedded value resolver is provided by Spring. It will try to resolve the
+property value and if it cannot be resolved, the property name (for example `${catalog.name}`)
+will be injected as the value. If you want to maintain strict control over nonexistent
+values, you should declare a `PropertySourcesPlaceholderConfigurer` bean, as the following
+example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Configuration
+    public class AppConfig {
+
+         @Bean
+         public static PropertySourcesPlaceholderConfigurer propertyPlaceholderConfigurer() {
+               return new PropertySourcesPlaceholderConfigurer();
+         }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class AppConfig {
+
+		@Bean
+		fun propertyPlaceholderConfigurer() = PropertySourcesPlaceholderConfigurer()
+	}
+----
+
+NOTE: When configuring a `PropertySourcesPlaceholderConfigurer` using JavaConfig, the
+`@Bean` method must be `static`.
+
+Using the above configuration ensures Spring initialization failure if any `${}`
+placeholder could not be resolved. It is also possible to use methods like
+`setPlaceholderPrefix`, `setPlaceholderSuffix`, or `setValueSeparator` to customize
+placeholders.
+
+NOTE: Spring Boot configures by default a `PropertySourcesPlaceholderConfigurer` bean that
+will get properties from `application.properties` and `application.yml` files.
+
+Built-in converter support provided by Spring allows simple type conversion (to `Integer`
+or `int` for example) to be automatically handled. Multiple comma-separated values can be
+automatically converted to String array without extra effort.
+
+It is possible to provide a default value as following:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Component
+    public class MovieRecommender {
+
+        private final String catalog;
+
+        public MovieRecommender(@Value("${catalog.name:defaultCatalog}") String catalog) {
+            this.catalog = catalog;
+        }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Component
+	class MovieRecommender(@Value("\${catalog.name:defaultCatalog}") private val catalog: String)
+----
+
+A Spring `BeanPostProcessor` uses a `ConversionService` behind the scene to handle the
+process for converting the String value in `@Value` to the target type. If you want to
+provide conversion support for your own custom type, you can provide your own
+`ConversionService` bean instance as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Configuration
+    public class AppConfig {
+
+        @Bean
+        public ConversionService conversionService() {
+            DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService();
+            conversionService.addConverter(new MyCustomConverter());
+            return conversionService;
+        }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class AppConfig {
+
+		@Bean
+		fun conversionService(): ConversionService {
+				return DefaultFormattingConversionService().apply {
+				addConverter(MyCustomConverter())
+			}
+		}
+	}
+----
+
+When `@Value` contains a xref:expressions:expressions.adoc#expressions[`SpEL` expression] the value will be dynamically
+computed at runtime as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Component
+    public class MovieRecommender {
+
+        private final String catalog;
+
+        public MovieRecommender(@Value("#{systemProperties['user.catalog'] + 'Catalog' }") String catalog) {
+            this.catalog = catalog;
+        }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Component
+	class MovieRecommender(
+		@Value("#{systemProperties['user.catalog'] + 'Catalog' }") private val catalog: String)
+----
+
+SpEL also enables the use of more complex data structures:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+    @Component
+    public class MovieRecommender {
+
+        private final Map<String, Integer> countOfMoviesPerCatalog;
+
+        public MovieRecommender(
+                @Value("#{{'Thriller': 100, 'Comedy': 300}}") Map<String, Integer> countOfMoviesPerCatalog) {
+            this.countOfMoviesPerCatalog = countOfMoviesPerCatalog;
+        }
+    }
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Component
+	class MovieRecommender(
+		@Value("#{{'Thriller': 100, 'Comedy': 300}}") private val countOfMoviesPerCatalog: Map<String, Int>)
+----
+
+
+[[beans-postconstruct-and-predestroy-annotations]]
+=== Using `@PostConstruct` and `@PreDestroy`
+
+The `CommonAnnotationBeanPostProcessor` not only recognizes the `@Resource` annotation
+but also the JSR-250 lifecycle annotations: `javax.annotation.PostConstruct` and
+`javax.annotation.PreDestroy`. Introduced in Spring 2.5, the support for these
+annotations offers an alternative to the lifecycle callback mechanism described in
+xref:beans:beans-factory-nature:beans-factory-lifecycle.adoc#beans-factory-lifecycle-initializingbean[initialization callbacks] and
+xref:beans:beans-factory-nature:beans-factory-lifecycle.adoc#beans-factory-lifecycle-disposablebean[destruction callbacks]. Provided that the
+`CommonAnnotationBeanPostProcessor` is registered within the Spring `ApplicationContext`,
+a method carrying one of these annotations is invoked at the same point in the lifecycle
+as the corresponding Spring lifecycle interface method or explicitly declared callback
+method. In the following example, the cache is pre-populated upon initialization and
+cleared upon destruction:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class CachingMovieLister {
+
+		@PostConstruct
+		public void populateMovieCache() {
+			// populates the movie cache upon initialization...
+		}
+
+		@PreDestroy
+		public void clearMovieCache() {
+			// clears the movie cache upon destruction...
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class CachingMovieLister {
+
+		@PostConstruct
+		fun populateMovieCache() {
+			// populates the movie cache upon initialization...
+		}
+
+		@PreDestroy
+		fun clearMovieCache() {
+			// clears the movie cache upon destruction...
+		}
+	}
+----
+
+For details about the effects of combining various lifecycle mechanisms, see
+xref:beans:beans-factory-nature:beans-factory-lifecycle.adoc#beans-factory-lifecycle-combined-effects[beans-factory-lifecycle-combined-effects].
+
+[NOTE]
+====
+Like `@Resource`, the `@PostConstruct` and `@PreDestroy` annotation types were a part
+of the standard Java libraries from JDK 6 to 8. However, the entire `javax.annotation`
+package got separated from the core Java modules in JDK 9 and eventually removed in
+JDK 11. If needed, the `javax.annotation-api` artifact needs to be obtained via Maven
+Central now, simply to be added to the application's classpath like any other library.
+====
+
+
+
+

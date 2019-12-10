@@ -1,0 +1,16 @@
+include::page$attributes.adoc[]
+[[integration-testing]]
+== Integration Testing
+
+This section (most of the rest of this chapter) covers integration testing for Spring
+applications. It includes the following topics:
+
+* xref:integration-testing:integration-testing-overview.adoc#integration-testing-overview[integration-testing-overview]
+* xref:integration-testing:integration-testing-goals.adoc#integration-testing-goals[integration-testing-goals]
+* xref:integration-testing:integration-testing-support-jdbc.adoc#integration-testing-support-jdbc[integration-testing-support-jdbc]
+* xref:integration-testing:integration-testing-annotations.adoc#integration-testing-annotations[integration-testing-annotations]
+* xref:integration-testing:testcontext-framework.adoc#testcontext-framework[testcontext-framework]
+* xref:integration-testing:spring-mvc-test-framework.adoc#spring-mvc-test-framework[spring-mvc-test-framework]
+
+
+

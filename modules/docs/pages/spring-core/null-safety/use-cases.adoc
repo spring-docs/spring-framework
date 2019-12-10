@@ -1,0 +1,14 @@
+include::page$attributes.adoc[]
+
+== Use cases
+
+In addition to providing an explicit declaration for Spring Framework API nullability,
+these annotations can be used by an IDE (such as IDEA or Eclipse) to provide useful
+warnings related to null-safety in order to avoid `NullPointerException` at runtime.
+
+They are also used to make Spring API null-safe in Kotlin projects, since Kotlin natively
+supports https://kotlinlang.org/docs/reference/null-safety.html[null-safety]. More details
+are available in the xref:kotlin:kotlin-null-safety.adoc#kotlin-null-safety[Kotlin support documentation].
+
+
+

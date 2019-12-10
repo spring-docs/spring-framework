@@ -1,0 +1,112 @@
+include::page$attributes.adoc[]
+[[format-configuring-formatting-globaldatetimeformat]]
+== Configuring a Global Date and Time Format
+
+By default, date and time fields that are not annotated with `@DateTimeFormat` are
+converted from strings by using the `DateFormat.SHORT` style. If you prefer, you can
+change this by defining your own global format.
+
+To do so, you need to ensure that Spring does not register default formatters. Instead,
+you should register all formatters manually. Use the
+`org.springframework.format.datetime.joda.JodaTimeFormatterRegistrar` or
+`org.springframework.format.datetime.DateFormatterRegistrar` class, depending on whether
+you use the Joda-Time library.
+
+For example, the following Java configuration registers a global `yyyyMMdd`
+format (this example does not depend on the Joda-Time library):
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	@Configuration
+	public class AppConfig {
+
+		@Bean
+		public FormattingConversionService conversionService() {
+
+			// Use the DefaultFormattingConversionService but do not register defaults
+			DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService(false);
+
+			// Ensure @NumberFormat is still supported
+			conversionService.addFormatterForFieldAnnotation(new NumberFormatAnnotationFormatterFactory());
+
+			// Register date conversion with a specific global format
+			DateFormatterRegistrar registrar = new DateFormatterRegistrar();
+			registrar.setFormatter(new DateFormatter("yyyyMMdd"));
+			registrar.registerFormatters(conversionService);
+
+			return conversionService;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	@Configuration
+	class AppConfig {
+
+		@Bean
+		fun conversionService(): FormattingConversionService {
+			// Use the DefaultFormattingConversionService but do not register defaults
+			return DefaultFormattingConversionService(false).apply {
+				// Ensure @NumberFormat is still supported
+				addFormatterForFieldAnnotation(NumberFormatAnnotationFormatterFactory())
+				// Register date conversion with a specific global format
+				val registrar = DateFormatterRegistrar()
+				registrar.setFormatter(DateFormatter("yyyyMMdd"))
+				registrar.registerFormatters(this)
+			}
+		}
+	}
+----
+
+If you prefer XML-based configuration, you can use a
+`FormattingConversionServiceFactoryBean`. The following example shows how to do so (this time using Joda
+Time):
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="
+			http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd>
+
+		<bean id="conversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
+			<property name="registerDefaultFormatters" value="false" />
+			<property name="formatters">
+				<set>
+					<bean class="org.springframework.format.number.NumberFormatAnnotationFormatterFactory" />
+				</set>
+			</property>
+			<property name="formatterRegistrars">
+				<set>
+					<bean class="org.springframework.format.datetime.joda.JodaTimeFormatterRegistrar">
+						<property name="dateFormatter">
+							<bean class="org.springframework.format.datetime.joda.DateTimeFormatterFactoryBean">
+								<property name="pattern" value="yyyyMMdd"/>
+							</bean>
+						</property>
+					</bean>
+				</set>
+			</property>
+		</bean>
+	</beans>
+----
+
+NOTE: Joda-Time provides separate distinct types to represent `date`, `time`, and `date-time`
+values. The `dateFormatter`, `timeFormatter`, and `dateTimeFormatter` properties of the
+`JodaTimeFormatterRegistrar` should be used to configure the different formats for each
+type. The `DateTimeFormatterFactoryBean` provides a convenient way to create formatters.
+
+NOTE: If you use Spring MVC, remember to explicitly configure the conversion service that
+is used. For Java-based `@Configuration`, this means extending the
+`WebMvcConfigurationSupport` class and overriding the `mvcConversionService()` method.
+For XML, you should use the `conversion-service` attribute of the
+`mvc:annotation-driven` element.
+See xref:mvc:mvc-config:mvc-config-conversion.adoc#mvc-config-conversion[Conversion and Formatting] for details.
+
+
+
+

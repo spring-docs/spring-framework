@@ -1,0 +1,9 @@
+include::page$attributes.adoc[]
+[[beans]]
+= The IoC Container
+
+This chapter covers Spring's Inversion of Control (IoC) container.
+
+
+
+

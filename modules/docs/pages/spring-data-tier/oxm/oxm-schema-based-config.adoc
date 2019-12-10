@@ -1,0 +1,38 @@
+include::page$attributes.adoc[]
+[[oxm-schema-based-config]]
+=== XML Configuration Namespace
+
+You can configure marshallers more concisely by using tags from the OXM namespace. To
+make these tags available, you must first reference the appropriate schema in the
+preamble of the XML configuration file. The following example shows how to do so:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:oxm="http://www.springframework.org/schema/oxm" <1>
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+      https://www.springframework.org/schema/beans/spring-beans.xsd
+      http://www.springframework.org/schema/oxm https://www.springframework.org/schema/oxm/spring-oxm.xsd"> <2>
+----
+<1> Reference the `oxm` schema.
+<2> Specify the `oxm` schema location.
+
+
+The schema makes the following elements available:
+
+* xref:oxm:oxm-jaxb:oxm-jaxb2.adoc#oxm-jaxb2-xsd[`jaxb2-marshaller`]
+* xref:oxm:oxm-jibx:oxm-jibx-marshaller.adoc#oxm-jibx-xsd[`jibx-marshaller`]
+
+Each tag is explained in its respective marshaller's section. As an example, though,
+the configuration of a JAXB2 marshaller might resemble the following:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<oxm:jaxb2-marshaller id="marshaller" contextPath="org.springframework.ws.samples.airline.schema"/>
+----
+
+
+

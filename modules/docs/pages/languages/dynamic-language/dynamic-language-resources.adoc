@@ -1,0 +1,10 @@
+include::page$attributes.adoc[]
+[[dynamic-language-resources]]
+== Further Resources
+
+The following links go to further resources about the various dynamic languages referenced
+in this chapter:
+
+* The http://www.groovy-lang.org/[Groovy] homepage
+* The http://www.beanshell.org/[BeanShell] homepage
+* The https://www.jruby.org[JRuby] homepage

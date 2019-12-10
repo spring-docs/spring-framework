@@ -1,0 +1,37 @@
+include::page$attributes.adoc[]
+[[mail]]
+== Email
+
+This section describes how to send email with the Spring Framework.
+
+.Library dependencies
+****
+The following JAR needs to be on the classpath of your application in order to use
+the Spring Framework's email library:
+
+* The https://javaee.github.io/javamail/[JavaMail] library
+
+This library is freely available on the web -- for example, in Maven Central as
+`com.sun.mail:javax.mail`.
+****
+
+The Spring Framework provides a helpful utility library for sending email that shields
+you from the specifics of the underlying mailing system and is responsible for
+low-level resource handling on behalf of the client.
+
+The `org.springframework.mail` package is the root level package for the Spring
+Framework's email support. The central interface for sending emails is the `MailSender`
+interface. A simple value object that encapsulates the properties of a simple mail such
+as `from` and `to` (plus many others) is the `SimpleMailMessage` class. This package
+also contains a hierarchy of checked exceptions that provide a higher level of
+abstraction over the lower level mail system exceptions, with the root exception being
+`MailException`. See the {api-spring-framework}/mail/MailException.html[javadoc]
+for more information on the rich mail exception hierarchy.
+
+The `org.springframework.mail.javamail.JavaMailSender` interface adds specialized
+JavaMail features, such as MIME message support to the `MailSender` interface
+(from which it inherits). `JavaMailSender` also provides a callback interface called
+`org.springframework.mail.javamail.MimeMessagePreparator` for preparing a `MimeMessage`.
+
+
+

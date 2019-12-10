@@ -1,0 +1,18 @@
+include::page$attributes.adoc[]
+[[webmvc-webclient]]
+== `WebClient`
+
+`WebClient` is a non-blocking, reactive client to perform HTTP requests. It was
+introduced in 5.0 and offers a modern alternative to the `RestTemplate`, with efficient
+support for both synchronous and asynchronous, as well as streaming scenarios.
+
+In contrast to `RestTemplate`, `WebClient` supports the following:
+
+* Non-blocking I/O.
+* Reactive Streams back pressure.
+* High concurrency with fewer hardware resources.
+* Functional-style, fluent API that takes advantage of Java 8 lambdas.
+* Synchronous and asynchronous interactions.
+* Streaming up to or streaming down from a server.
+
+See xref:webflux-client:webflux-client.adoc#webflux-client[WebClient] for more details.

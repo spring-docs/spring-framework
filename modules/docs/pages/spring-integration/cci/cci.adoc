@@ -1,0 +1,30 @@
+include::page$attributes.adoc[]
+[[cci]]
+== JCA CCI
+
+Java EE provides a specification to standardize access to enterprise information systems
+(EIS): the JCA (Java EE Connector Architecture). This specification is divided into
+two different parts:
+
+* SPI (Service Provider Interfaces) that the connector provider must implement. These
+  interfaces constitute a resource adapter that can be deployed on a Java EE
+  application server. In such a scenario, the server manages connection pooling,
+  transactions, and security (managed mode). The application server is also responsible
+  for managing the configuration, which is held outside the client application. A
+  connector can be used without an application server as well. In this case, the
+  application must configure it directly (non-managed mode).
+* CCI (Common Client Interface) that an application can use to interact with the
+  connector and, thus, communicate with an EIS. An API for local transaction demarcation
+  is provided as well.
+
+The aim of the Spring CCI support is to provide classes to access a CCI connector in
+typical Spring style, using the Spring Framework's general resource and transaction
+management facilities.
+
+NOTE: The client side of connectors does not always use CCI. Some connectors expose their own
+APIs, providing a JCA resource adapter to use the system contracts of a Java EE container
+(connection pooling, global transactions, and security). Spring does not offer special
+support for such connector-specific APIs.
+
+
+

@@ -1,0 +1,100 @@
+include::page$attributes.adoc[]
+[[remoting-rmi]]
+=== RMI
+
+By using Spring's support for RMI, you can transparently expose your services through the
+RMI infrastructure. After having this set up, you basically have a configuration similar
+to remote EJBs, except for the fact that there is no standard support for security
+context propagation or remote transaction propagation. Spring does provide hooks for
+such additional invocation context when you use the RMI invoker, so you can, for example,
+plug in security frameworks or custom security credentials.
+
+
+[[remoting-rmi-server]]
+==== Exporting the Service by Using `RmiServiceExporter`
+
+Using the `RmiServiceExporter`, we can expose the interface of our AccountService object
+as RMI object. The interface can be accessed by using `RmiProxyFactoryBean`, or via
+plain RMI in case of a traditional RMI service. The `RmiServiceExporter` explicitly
+supports the exposing of any non-RMI services via RMI invokers.
+
+We first have to set up our service in the Spring container.
+The following example shows how to do so:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="accountService" class="example.AccountServiceImpl">
+		<!-- any additional properties, maybe a DAO? -->
+	</bean>
+----
+
+Next, we have to expose our service by using `RmiServiceExporter`.
+The following example shows how to do so:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean class="org.springframework.remoting.rmi.RmiServiceExporter">
+		<!-- does not necessarily have to be the same name as the bean to be exported -->
+		<property name="serviceName" value="AccountService"/>
+		<property name="service" ref="accountService"/>
+		<property name="serviceInterface" value="example.AccountService"/>
+		<!-- defaults to 1099 -->
+		<property name="registryPort" value="1199"/>
+	</bean>
+----
+
+In the preceding example, we override the port for the RMI registry. Often, your application
+server also maintains an RMI registry, and it is wise to not interfere with that one.
+Furthermore, the service name is used to bind the service. So, in the preceding example, the
+service is bound at `'rmi://HOST:1199/AccountService'`. We use this URL later on to link in
+the service at the client side.
+
+NOTE: The `servicePort` property has been omitted (it defaults to 0). This means that an
+anonymous port is used to communicate with the service.
+
+
+[[remoting-rmi-client]]
+==== Linking in the Service at the Client
+
+Our client is a simple object that uses the `AccountService` to manage accounts,
+as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class SimpleObject {
+
+		private AccountService accountService;
+
+		public void setAccountService(AccountService accountService) {
+			this.accountService = accountService;
+		}
+
+		// additional methods using the accountService
+	}
+----
+
+To link in the service on the client, we create a separate Spring container,
+to contain the following simple object and the service linking configuration bits:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean class="example.SimpleObject">
+		<property name="accountService" ref="accountService"/>
+	</bean>
+
+	<bean id="accountService" class="org.springframework.remoting.rmi.RmiProxyFactoryBean">
+		<property name="serviceUrl" value="rmi://HOST:1199/AccountService"/>
+		<property name="serviceInterface" value="example.AccountService"/>
+	</bean>
+----
+
+That is all we need to do to support the remote account service on the client. Spring
+transparently creates an invoker and remotely enables the account service through the
+`RmiServiceExporter`. At the client, we link it in by using the `RmiProxyFactoryBean`.
+
+
+

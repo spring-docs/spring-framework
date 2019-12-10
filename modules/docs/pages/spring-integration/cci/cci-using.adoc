@@ -1,0 +1,515 @@
+include::page$attributes.adoc[]
+[[cci-using]]
+=== Using Spring's CCI Access Support
+
+This section describes how to use Spring's support for CCI to achieve various purposes.
+It includes the following topics:
+
+* xref:cci:cci-using:cci-record-creator.adoc#cci-record-creator[cci-record-creator]
+* xref:cci:cci-using:cci-using-template.adoc#cci-using-template[cci-using-template]
+* xref:cci:cci-using:cci-using-dao.adoc#cci-using-dao[cci-using-dao]
+* xref:cci:cci-using:automatic-output-generation.adoc#automatic-output-generation[automatic-output-generation]
+* xref:cci:cci-using:template-summary.adoc#template-summary[template-summary]
+* xref:cci:cci-using:cci-straight.adoc#cci-straight[cci-straight]
+* xref:cci:cci-using:cci-template-example.adoc#cci-template-example[cci-template-example]
+
+
+[[cci-record-creator]]
+==== Record Conversion
+
+One of the aims of Spring's JCA CCI support is to provide convenient facilities for
+manipulating CCI records. You can specify the strategy to create records and extract
+data from records, for use with Spring's `CciTemplate`. The interfaces described in
+this section configure the strategy to use input and output records if you do not want
+to work with records directly in your application.
+
+To create an input `Record`, you can use a dedicated implementation of the `RecordCreator`
+interface. The following listing shows the `RecordCreator` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface RecordCreator {
+
+		Record createRecord(RecordFactory recordFactory) throws ResourceException, DataAccessException;
+
+	}
+----
+
+The `createRecord(..)` method receives a `RecordFactory` instance as a
+parameter, which corresponds to the `RecordFactory` of the `ConnectionFactory` used.
+You can use this reference to create `IndexedRecord` or `MappedRecord` instances. The
+following sample shows how to use the `RecordCreator` interface and indexed or mapped
+records:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyRecordCreator implements RecordCreator {
+
+		public Record createRecord(RecordFactory recordFactory) throws ResourceException {
+			IndexedRecord input = recordFactory.createIndexedRecord("input");
+			input.add(new Integer(id));
+			return input;
+		}
+
+	}
+----
+
+You can use an output `Record` to receive data back from the EIS. Hence, you can pass a specific
+implementation of the `RecordExtractor` interface to Spring's
+`CciTemplate` to extract data from the output `Record`. The following listing shows the
+`RecordExtractor` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface RecordExtractor {
+
+		Object extractData(Record record) throws ResourceException, SQLException, DataAccessException;
+
+	}
+----
+
+The following example shows how to use the `RecordExtractor` interface:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyRecordExtractor implements RecordExtractor {
+
+		public Object extractData(Record record) throws ResourceException {
+			CommAreaRecord commAreaRecord = (CommAreaRecord) record;
+			String str = new String(commAreaRecord.toByteArray());
+			String field1 = string.substring(0,6);
+			String field2 = string.substring(6,1);
+			return new OutputObject(Long.parseLong(field1), field2);
+		}
+
+	}
+----
+
+
+[[cci-using-template]]
+==== Using `CciTemplate`
+
+The `CciTemplate` is the central class of the core CCI support package (
+`org.springframework.jca.cci.core`). It simplifies the use of CCI, since it handles the
+creation and release of resources. This helps to avoid common errors, such as forgetting to
+always close the connection. It cares for the lifecycle of connection and interaction
+objects, letting application code focus on generating input records from application
+data and extracting application data from output records.
+
+The JCA CCI specification defines two distinct methods to call operations on an EIS. The
+CCI `Interaction` interface provides two execute method signatures, as the following
+listing shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface javax.resource.cci.Interaction {
+
+		...
+
+		boolean execute(InteractionSpec spec, Record input, Record output) throws ResourceException;
+
+		Record execute(InteractionSpec spec, Record input) throws ResourceException;
+
+		...
+
+	}
+----
+
+Depending on the template method called, `CciTemplate` knows which `execute` method
+to call on the interaction. In any case, a correctly initialized `InteractionSpec`
+instance is mandatory.
+
+You can use `CciTemplate.execute(..)` in two ways:
+
+* With direct `Record` arguments. In this case, you need to pass in the CCI input
+  record, and the returned object is the corresponding CCI output record.
+* With application objects, by using record mapping. In this case, you need to provide
+  corresponding `RecordCreator` and `RecordExtractor` instances.
+
+With the first approach, the following methods (which directly correspond to those on the
+`Interaction` interface) of the template are used:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class CciTemplate implements CciOperations {
+
+		public Record execute(InteractionSpec spec, Record inputRecord)
+				throws DataAccessException { ... }
+
+		public void execute(InteractionSpec spec, Record inputRecord, Record outputRecord)
+				throws DataAccessException { ... }
+
+	}
+----
+
+With the second approach, we need to specify the record creation and record
+extraction strategies as arguments. The interfaces used are those describe in the
+xref:cci:cci-using:cci-record-creator.adoc#cci-record-creator[previous section on record conversion]. The following
+listing shows the corresponding `CciTemplate` methods:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class CciTemplate implements CciOperations {
+
+		public Record execute(InteractionSpec spec,
+				RecordCreator inputCreator) throws DataAccessException {
+			// ...
+		}
+
+		public Object execute(InteractionSpec spec, Record inputRecord,
+				RecordExtractor outputExtractor) throws DataAccessException {
+			// ...
+		}
+
+		public Object execute(InteractionSpec spec, RecordCreator creator,
+				RecordExtractor extractor) throws DataAccessException {
+			// ...
+		}
+
+	}
+----
+
+Unless the `outputRecordCreator` property is set on the template (see the following
+section), every method calls the corresponding `execute` method of the CCI
+`Interaction` with two parameters: `InteractionSpec` and an input `Record`. It receives an
+output `Record` as its return value.
+
+`CciTemplate` also provides methods to create `IndexRecord` and `MappedRecord` outside of a
+`RecordCreator` implementation, through its `createIndexRecord(..)` and
+`createMappedRecord(..)` methods. You can use this within DAO implementations to create
+`Record` instances to pass into corresponding `CciTemplate.execute(..)` methods.
+The following listing shows the `CciTemplate` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class CciTemplate implements CciOperations {
+
+		public IndexedRecord createIndexedRecord(String name) throws DataAccessException { ... }
+
+		public MappedRecord createMappedRecord(String name) throws DataAccessException { ... }
+
+	}
+----
+
+
+[[cci-using-dao]]
+==== Using DAO Support
+
+Spring's CCI support provides an abstract class for DAOs, supporting injection of a
+`ConnectionFactory` or a `CciTemplate` instance. The name of the class is
+`CciDaoSupport`. It provides simple `setConnectionFactory` and `setCciTemplate` methods.
+Internally, this class creates a `CciTemplate` instance for a passed-in
+`ConnectionFactory`, exposing it to concrete data access implementations in subclasses.
+The following example shows how to use `CciDaoSupport`:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public abstract class CciDaoSupport {
+
+		public void setConnectionFactory(ConnectionFactory connectionFactory) {
+			// ...
+		}
+
+		public ConnectionFactory getConnectionFactory() {
+			// ...
+		}
+
+		public void setCciTemplate(CciTemplate cciTemplate) {
+			// ...
+		}
+
+		public CciTemplate getCciTemplate() {
+			// ...
+		}
+
+	}
+----
+
+
+[[automatic-output-generation]]
+==== Automatic Output Record Generation
+
+If the connector you use supports only the `Interaction.execute(..)` method with input and
+output records as parameters (that is, it requires the desired output record to be passed
+in instead of returning an appropriate output record), you can set the `outputRecordCreator`
+property of the `CciTemplate` to automatically generate an output record to be filled by
+the JCA connector when the response is received. This record is then returned to the caller
+of the template.
+
+This property holds an implementation of the xref:cci:cci-using:cci-record-creator.adoc#cci-record-creator[`RecordCreator` interface],
+to be used for that purpose. You must directly specify the `outputRecordCreator` property on
+the `CciTemplate`. The following example shows how to do so:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	cciTemplate.setOutputRecordCreator(new EciOutputRecordCreator());
+----
+
+Alternatively (and we recommend this approach), in the Spring configuration, if the
+`CciTemplate` is configured as a dedicated bean instance, you can define beans in the
+following fashion:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="eciOutputRecordCreator" class="eci.EciOutputRecordCreator"/>
+
+	<bean id="cciTemplate" class="org.springframework.jca.cci.core.CciTemplate">
+		<property name="connectionFactory" ref="eciConnectionFactory"/>
+		<property name="outputRecordCreator" ref="eciOutputRecordCreator"/>
+	</bean>
+----
+
+NOTE: As the `CciTemplate` class is thread-safe, it is usually configured as a shared
+instance.
+
+
+[[template-summary]]
+==== `CciTemplate` `Interaction` Summary
+
+The following table summarizes the mechanisms of the `CciTemplate` class and the
+corresponding methods called on the CCI `Interaction` interface:
+
+[[cci-interaction-execute-methods]]
+.Usage of Interaction execute methods
+[cols="3,1,3"]
+|===
+| `CciTemplate` method signature | `CciTemplate` `outputRecordCreator` property | `execute` method called on the CCI Interaction
+
+| `Record execute(InteractionSpec, Record)`
+| Not set
+| `Record execute(InteractionSpec, Record)`
+
+| `Record execute(InteractionSpec, Record)`
+| Set
+| `boolean execute(InteractionSpec, Record, Record)`
+
+| void execute(InteractionSpec, Record, Record)
+| Not set
+| void execute(InteractionSpec, Record, Record)
+
+| `void execute(InteractionSpec, Record, Record)`
+| Set
+| `void execute(InteractionSpec, Record, Record)`
+
+| `Record execute(InteractionSpec, RecordCreator)`
+| Not set
+| `Record execute(InteractionSpec, Record)`
+
+| `Record execute(InteractionSpec, RecordCreator)`
+| Set
+| `void execute(InteractionSpec, Record, Record)`
+
+| `Record execute(InteractionSpec, Record, RecordExtractor)`
+| Not set
+| `Record execute(InteractionSpec, Record)`
+
+| `Record execute(InteractionSpec, Record, RecordExtractor)`
+| Set
+| `void execute(InteractionSpec, Record, Record)`
+
+| `Record execute(InteractionSpec, RecordCreator, RecordExtractor)`
+| Not set
+| `Record execute(InteractionSpec, Record)`
+
+| `Record execute(InteractionSpec, RecordCreator, RecordExtractor)`
+| Set
+| `void execute(InteractionSpec, Record, Record)`
+|===
+
+
+[[cci-straight]]
+==== Using a CCI Connection and an Interaction Directly
+
+`CciTemplate` also lets you work directly with CCI connections and
+interactions, in the same manner as `JdbcTemplate` and `JmsTemplate`. This is useful
+when you want to perform multiple operations on a CCI connection or interaction, for
+example.
+
+The `ConnectionCallback` interface provides a CCI `Connection` as an argument (to
+perform custom operations on it) plus the CCI `ConnectionFactory` with which the `Connection`
+was created. The latter can be useful (for example, to get an associated
+`RecordFactory` instance and create indexed/mapped records).
+The following listing shows the `ConnectionCallback` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface ConnectionCallback {
+
+		Object doInConnection(Connection connection, ConnectionFactory connectionFactory)
+				throws ResourceException, SQLException, DataAccessException;
+
+	}
+----
+
+The `InteractionCallback` interface provides the CCI `Interaction` (to perform
+custom operations on it) plus the corresponding CCI `ConnectionFactory`.
+The following listing shows the `InteractionCallback` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface InteractionCallback {
+
+		Object doInInteraction(Interaction interaction, ConnectionFactory connectionFactory)
+			throws ResourceException, SQLException, DataAccessException;
+
+	}
+----
+
+NOTE: `InteractionSpec` objects can either be shared across multiple template calls or be newly
+created inside every callback method. This is completely up to the DAO implementation.
+
+
+[[cci-template-example]]
+==== Example of `CciTemplate` Usage
+
+In this section, we show the usage of the `CciTemplate` to access a CICS with
+ECI mode, with the IBM CICS ECI connector.
+
+First, we must do some initializations on the CCI `InteractionSpec` to specify which
+CICS program to access and how to interact with it, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	ECIInteractionSpec interactionSpec = new ECIInteractionSpec();
+	interactionSpec.setFunctionName("MYPROG");
+	interactionSpec.setInteractionVerb(ECIInteractionSpec.SYNC_SEND_RECEIVE);
+----
+
+Then the program can use CCI through Spring's template and specify mappings between custom
+objects and CCI `Records`, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyDaoImpl extends CciDaoSupport implements MyDao {
+
+		public OutputObject getData(InputObject input) {
+			ECIInteractionSpec interactionSpec = ...;
+
+		OutputObject output = (ObjectOutput) getCciTemplate().execute(interactionSpec,
+			new RecordCreator() {
+				public Record createRecord(RecordFactory recordFactory) throws ResourceException {
+					return new CommAreaRecord(input.toString().getBytes());
+				}
+			},
+			new RecordExtractor() {
+				public Object extractData(Record record) throws ResourceException {
+					CommAreaRecord commAreaRecord = (CommAreaRecord)record;
+					String str = new String(commAreaRecord.toByteArray());
+					String field1 = string.substring(0,6);
+					String field2 = string.substring(6,1);
+					return new OutputObject(Long.parseLong(field1), field2);
+				}
+			});
+
+			return output;
+		}
+	}
+----
+
+As discussed previously, you can use callbacks to work directly on CCI connections or
+interactions. The following example shows how to do so:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyDaoImpl extends CciDaoSupport implements MyDao {
+
+		public OutputObject getData(InputObject input) {
+			ObjectOutput output = (ObjectOutput) getCciTemplate().execute(
+				new ConnectionCallback() {
+					public Object doInConnection(Connection connection,
+							ConnectionFactory factory) throws ResourceException {
+
+						// do something...
+
+					}
+				});
+			}
+			return output;
+		}
+
+	}
+----
+
+NOTE: With a `ConnectionCallback`, the `Connection` used is managed and closed by the
+`CciTemplate`, but the callback implementation must manage any interactions created on the
+connection.
+
+For a more specific callback, you can implement an `InteractionCallback`. If you do so, the passed-in
+`Interaction` is managed and closed by the `CciTemplate`. The following example shows how to do so:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class MyDaoImpl extends CciDaoSupport implements MyDao {
+
+		public String getData(String input) {
+			ECIInteractionSpec interactionSpec = ...;
+			String output = (String) getCciTemplate().execute(interactionSpec,
+				new InteractionCallback() {
+					public Object doInInteraction(Interaction interaction,
+							ConnectionFactory factory) throws ResourceException {
+						Record input = new CommAreaRecord(inputString.getBytes());
+						Record output = new CommAreaRecord();
+						interaction.execute(holder.getInteractionSpec(), input, output);
+						return new String(output.toByteArray());
+					}
+				});
+			return output;
+		}
+
+	}
+----
+
+For the preceding examples, the corresponding configuration of the involved Spring beans
+could resemble the following example in non-managed mode:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="managedConnectionFactory" class="com.ibm.connector2.cics.ECIManagedConnectionFactory">
+		<property name="serverName" value="TXSERIES"/>
+		<property name="connectionURL" value="local:"/>
+		<property name="userName" value="CICSUSER"/>
+		<property name="password" value="CICS"/>
+	</bean>
+
+	<bean id="connectionFactory" class="org.springframework.jca.support.LocalConnectionFactoryBean">
+		<property name="managedConnectionFactory" ref="managedConnectionFactory"/>
+	</bean>
+
+	<bean id="component" class="mypackage.MyDaoImpl">
+		<property name="connectionFactory" ref="connectionFactory"/>
+	</bean>
+----
+
+In managed mode (that is, in a Java EE environment), the configuration could resemble
+the following example:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<jee:jndi-lookup id="connectionFactory" jndi-name="eis/cicseci"/>
+
+	<bean id="component" class="MyDaoImpl">
+		<property name="connectionFactory" ref="connectionFactory"/>
+	</bean>
+----
+
+
+

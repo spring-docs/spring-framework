@@ -1,0 +1,21 @@
+include::page$attributes.adoc[]
+[[dynamic-language]]
+= Dynamic Language Support
+
+Spring provides comprehensive support for using classes and objects that have been
+defined by using a dynamic language (such as Groovy) with Spring. This support lets
+you write any number of classes in a supported dynamic language and have the Spring
+container transparently instantiate, configure, and dependency inject the resulting
+objects.
+
+Spring's scripting support primarily targets Groovy and BeanShell. Beyond those
+specifically supported languages, the JSR-223 scripting mechanism is supported
+for integration with any JSR-223 capable language provider (as of Spring 4.2),
+e.g. JRuby.
+
+You can find fully working examples of where this dynamic language support can be
+immediately useful in xref:dynamic-language:dynamic-language-scenarios.adoc#dynamic-language-scenarios[dynamic-language-scenarios].
+
+
+
+

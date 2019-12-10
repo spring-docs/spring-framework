@@ -1,0 +1,160 @@
+include::page$attributes.adoc[]
+[[remoting-jms]]
+=== JMS
+
+You can also expose services transparently by using JMS as the underlying communication
+protocol. The JMS remoting support in the Spring Framework is pretty basic. It sends
+and receives on the `same thread` and in the same non-transactional `Session`.
+As a result, throughput is implementation-dependent. Note that these single-threaded
+and non-transactional constraints apply only to Spring's JMS remoting support.
+See xref:jms:jms.adoc#jms[jms] for information on Spring's rich support for JMS-based messaging.
+
+The following interface is used on both the server and the client sides:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	package com.foo;
+
+	public interface CheckingAccountService {
+
+		public void cancelAccount(Long accountId);
+	}
+----
+
+The following simple implementation of the preceding interface is used on the server-side:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	package com.foo;
+
+	public class SimpleCheckingAccountService implements CheckingAccountService {
+
+		public void cancelAccount(Long accountId) {
+			System.out.println("Cancelling account [" + accountId + "]");
+		}
+	}
+----
+
+The following configuration file contains the JMS-infrastructure beans that are shared
+on both the client and the server:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean id="connectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+			<property name="brokerURL" value="tcp://ep-t43:61616"/>
+		</bean>
+
+		<bean id="queue" class="org.apache.activemq.command.ActiveMQQueue">
+			<constructor-arg value="mmm"/>
+		</bean>
+
+	</beans>
+----
+
+
+[[remoting-jms-server]]
+==== Server-side Configuration
+
+On the server, you need to expose the service object that uses the
+`JmsInvokerServiceExporter`, as the following example shows:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean id="checkingAccountService"
+				class="org.springframework.jms.remoting.JmsInvokerServiceExporter">
+			<property name="serviceInterface" value="com.foo.CheckingAccountService"/>
+			<property name="service">
+				<bean class="com.foo.SimpleCheckingAccountService"/>
+			</property>
+		</bean>
+
+		<bean class="org.springframework.jms.listener.SimpleMessageListenerContainer">
+			<property name="connectionFactory" ref="connectionFactory"/>
+			<property name="destination" ref="queue"/>
+			<property name="concurrentConsumers" value="3"/>
+			<property name="messageListener" ref="checkingAccountService"/>
+		</bean>
+
+	</beans>
+----
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	package com.foo;
+
+	import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+	public class Server {
+
+		public static void main(String[] args) throws Exception {
+			new ClassPathXmlApplicationContext("com/foo/server.xml", "com/foo/jms.xml");
+		}
+	}
+----
+
+
+[[remoting-jms-client]]
+==== Client-side Configuration
+
+The client merely needs to create a client-side proxy that implements the agreed-upon
+interface (`CheckingAccountService`).
+
+The following example defines beans that you can inject into other client-side objects
+(and the proxy takes care of forwarding the call to the server-side object via JMS):
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean id="checkingAccountService"
+				class="org.springframework.jms.remoting.JmsInvokerProxyFactoryBean">
+			<property name="serviceInterface" value="com.foo.CheckingAccountService"/>
+			<property name="connectionFactory" ref="connectionFactory"/>
+			<property name="queue" ref="queue"/>
+		</bean>
+
+	</beans>
+----
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	package com.foo;
+
+	import org.springframework.context.ApplicationContext;
+	import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+	public class Client {
+
+		public static void main(String[] args) throws Exception {
+			ApplicationContext ctx = new ClassPathXmlApplicationContext("com/foo/client.xml", "com/foo/jms.xml");
+			CheckingAccountService service = (CheckingAccountService) ctx.getBean("checkingAccountService");
+			service.cancelAccount(new Long(10));
+		}
+	}
+----
+
+
+

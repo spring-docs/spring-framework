@@ -1,0 +1,1781 @@
+include::page$attributes.adoc[]
+[[beans-dependencies]]
+== Dependencies
+
+A typical enterprise application does not consist of a single object (or bean in the
+Spring parlance). Even the simplest application has a few objects that work together to
+present what the end-user sees as a coherent application. This next section explains how
+you go from defining a number of bean definitions that stand alone to a fully realized
+application where objects collaborate to achieve a goal.
+
+
+
+[[beans-factory-collaborators]]
+=== Dependency Injection
+
+Dependency injection (DI) is a process whereby objects define their dependencies
+(that is, the other objects with which they work) only through constructor arguments, arguments
+to a factory method, or properties that are set on the object instance after it is
+constructed or returned from a factory method. The container then injects those
+dependencies when it creates the bean. This process is fundamentally the inverse (hence
+the name, Inversion of Control) of the bean itself controlling the instantiation
+or location of its dependencies on its own by using direct construction of classes or
+the Service Locator pattern.
+
+Code is cleaner with the DI principle, and decoupling is more effective when objects are
+provided with their dependencies. The object does not look up its dependencies and does
+not know the location or class of the dependencies. As a result, your classes become easier
+to test, particularly when the dependencies are on interfaces or abstract base classes,
+which allow for stub or mock implementations to be used in unit tests.
+
+DI exists in two major variants: <<beans-constructor-injection,Constructor-based
+dependency injection>> and xref:beans:beans-dependencies:beans-factory-collaborators.adoc#beans-setter-injection[Setter-based dependency injection].
+
+
+[[beans-constructor-injection]]
+==== Constructor-based Dependency Injection
+
+Constructor-based DI is accomplished by the container invoking a constructor with a
+number of arguments, each representing a dependency. Calling a `static` factory method
+with specific arguments to construct the bean is nearly equivalent, and this discussion
+treats arguments to a constructor and to a `static` factory method similarly. The
+following example shows a class that can only be dependency-injected with constructor
+injection:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		// the SimpleMovieLister has a dependency on a MovieFinder
+		private MovieFinder movieFinder;
+
+		// a constructor so that the Spring container can inject a MovieFinder
+		public SimpleMovieLister(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+
+		// business logic that actually uses the injected MovieFinder is omitted...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// a constructor so that the Spring container can inject a MovieFinder
+	class SimpleMovieLister(private val movieFinder: MovieFinder) {
+		// business logic that actually uses the injected MovieFinder is omitted...
+	}
+----
+
+Notice that there is nothing special about this class. It is a POJO that
+has no dependencies on container specific interfaces, base classes or annotations.
+
+[[beans-factory-ctor-arguments-resolution]]
+===== Constructor Argument Resolution
+
+Constructor argument resolution matching occurs by using the argument's type. If no
+potential ambiguity exists in the constructor arguments of a bean definition, the
+order in which the constructor arguments are defined in a bean definition is the order
+in which those arguments are supplied to the appropriate constructor when the bean is
+being instantiated. Consider the following class:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	package x.y;
+
+	public class ThingOne {
+
+		public ThingOne(ThingTwo thingTwo, ThingThree thingThree) {
+			// ...
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	package x.y
+
+	class ThingOne(thingTwo: ThingTwo, thingThree: ThingThree)
+----
+
+Assuming that `ThingTwo` and `ThingThree` classes are not related by inheritance, no potential
+ambiguity exists. Thus, the following configuration works fine, and you do not need to specify
+the constructor argument indexes or types explicitly in the `<constructor-arg/>`
+element.
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="beanOne" class="x.y.ThingOne">
+			<constructor-arg ref="beanTwo"/>
+			<constructor-arg ref="beanThree"/>
+		</bean>
+
+		<bean id="beanTwo" class="x.y.ThingTwo"/>
+
+		<bean id="beanThree" class="x.y.ThingThree"/>
+	</beans>
+----
+
+When another bean is referenced, the type is known, and matching can occur (as was the
+case with the preceding example). When a simple type is used, such as
+`<value>true</value>`, Spring cannot determine the type of the value, and so cannot match
+by type without help. Consider the following class:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	package examples;
+
+	public class ExampleBean {
+
+		// Number of years to calculate the Ultimate Answer
+		private int years;
+
+		// The Answer to Life, the Universe, and Everything
+		private String ultimateAnswer;
+
+		public ExampleBean(int years, String ultimateAnswer) {
+			this.years = years;
+			this.ultimateAnswer = ultimateAnswer;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	package examples
+
+	class ExampleBean(
+		private val years: Int, // Number of years to calculate the Ultimate Answer
+		private val ultimateAnswer: String// The Answer to Life, the Universe, and Everything
+	)
+----
+
+.[[beans-factory-ctor-arguments-type]]Constructor argument type matching
+--
+In the preceding scenario, the container can use type matching with simple types if
+you explicitly specify the type of the constructor argument by using the `type` attribute.
+as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean">
+		<constructor-arg type="int" value="7500000"/>
+		<constructor-arg type="java.lang.String" value="42"/>
+	</bean>
+----
+--
+
+.[[beans-factory-ctor-arguments-index]]Constructor argument index
+--
+You can use the `index` attribute to specify explicitly the index of constructor arguments,
+as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean">
+		<constructor-arg index="0" value="7500000"/>
+		<constructor-arg index="1" value="42"/>
+	</bean>
+----
+
+In addition to resolving the ambiguity of multiple simple values, specifying an index
+resolves ambiguity where a constructor has two arguments of the same type.
+
+NOTE: The index is 0-based.
+--
+
+.[[beans-factory-ctor-arguments-name]]Constructor argument name
+--
+You can also use the constructor parameter name for value disambiguation, as the following
+example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean">
+		<constructor-arg name="years" value="7500000"/>
+		<constructor-arg name="ultimateAnswer" value="42"/>
+	</bean>
+----
+
+Keep in mind that, to make this work out of the box, your code must be compiled with the
+debug flag enabled so that Spring can look up the parameter name from the constructor.
+If you cannot or do not want to compile your code with the debug flag, you can use the
+https://download.oracle.com/javase/8/docs/api/java/beans/ConstructorProperties.html[@ConstructorProperties]
+JDK annotation to explicitly name your constructor arguments. The sample class would
+then have to look as follows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	package examples;
+
+	public class ExampleBean {
+
+		// Fields omitted
+
+		@ConstructorProperties({"years", "ultimateAnswer"})
+		public ExampleBean(int years, String ultimateAnswer) {
+			this.years = years;
+			this.ultimateAnswer = ultimateAnswer;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	package examples
+
+	class ExampleBean
+	@ConstructorProperties("years", "ultimateAnswer")
+	constructor(val years: Int, val ultimateAnswer: String)
+----
+--
+
+
+[[beans-setter-injection]]
+==== Setter-based Dependency Injection
+
+Setter-based DI is accomplished by the container calling setter methods on your
+beans after invoking a no-argument constructor or a no-argument `static` factory method to
+instantiate your bean.
+
+The following example shows a class that can only be dependency-injected by using pure
+setter injection. This class is conventional Java. It is a POJO that has no dependencies
+on container specific interfaces, base classes, or annotations.
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SimpleMovieLister {
+
+		// the SimpleMovieLister has a dependency on the MovieFinder
+		private MovieFinder movieFinder;
+
+		// a setter method so that the Spring container can inject a MovieFinder
+		public void setMovieFinder(MovieFinder movieFinder) {
+			this.movieFinder = movieFinder;
+		}
+
+		// business logic that actually uses the injected MovieFinder is omitted...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class SimpleMovieLister {
+
+	// a late-initialized property so that the Spring container can inject a MovieFinder
+	lateinit var movieFinder: MovieFinder
+
+	// business logic that actually uses the injected MovieFinder is omitted...
+}
+----
+
+
+The `ApplicationContext` supports constructor-based and setter-based DI for the beans it
+manages. It also supports setter-based DI after some dependencies have already been
+injected through the constructor approach. You configure the dependencies in the form of
+a `BeanDefinition`, which you use in conjunction with `PropertyEditor` instances to
+convert properties from one format to another. However, most Spring users do not work
+with these classes directly (that is, programmatically) but rather with XML `bean`
+definitions, annotated components (that is, classes annotated with `@Component`,
+`@Controller`, and so forth), or `@Bean` methods in Java-based `@Configuration` classes.
+These sources are then converted internally into instances of `BeanDefinition` and used to
+load an entire Spring IoC container instance.
+
+[[beans-constructor-vs-setter-injection]]
+.Constructor-based or setter-based DI?
+****
+Since you can mix constructor-based and setter-based DI, it is a good rule of thumb to
+use constructors for mandatory dependencies and setter methods or configuration methods
+for optional dependencies. Note that use of the xref:beans:beans-annotation-config:beans-required-annotation.adoc#beans-required-annotation[@Required]
+annotation on a setter method can be used to make the property be a required dependency;
+however, constructor injection with programmatic validation of arguments is preferable.
+
+The Spring team generally advocates constructor injection, as it lets you implement
+application components as immutable objects and ensures that required dependencies
+are not `null`. Furthermore, constructor-injected components are always returned to the client
+(calling) code in a fully initialized state. As a side note, a large number of constructor
+arguments is a bad code smell, implying that the class likely has too many
+responsibilities and should be refactored to better address proper separation of concerns.
+
+Setter injection should primarily only be used for optional dependencies that can be
+assigned reasonable default values within the class. Otherwise, not-null checks must be
+performed everywhere the code uses the dependency. One benefit of setter injection is that
+setter methods make objects of that class amenable to reconfiguration or re-injection
+later. Management through xref:jmx:jmx.adoc#jmx[JMX MBeans] is therefore a compelling
+use case for setter injection.
+
+Use the DI style that makes the most sense for a particular class. Sometimes, when dealing
+with third-party classes for which you do not have the source, the choice is made for you.
+For example, if a third-party class does not expose any setter methods, then constructor
+injection may be the only available form of DI.
+****
+
+
+[[beans-dependency-resolution]]
+==== Dependency Resolution Process
+
+The container performs bean dependency resolution as follows:
+
+* The `ApplicationContext` is created and initialized with configuration metadata that
+  describes all the beans. Configuration metadata can be specified by XML, Java code, or
+  annotations.
+* For each bean, its dependencies are expressed in the form of properties, constructor
+  arguments, or arguments to the static-factory method (if you use that instead of a
+  normal constructor). These dependencies are provided to the bean, when the bean is
+  actually created.
+* Each property or constructor argument is an actual definition of the value to set, or
+  a reference to another bean in the container.
+* Each property or constructor argument that is a value is converted from its specified
+  format to the actual type of that property or constructor argument. By default, Spring
+  can convert a value supplied in string format to all built-in types, such as `int`,
+  `long`, `String`, `boolean`, and so forth.
+
+The Spring container validates the configuration of each bean as the container is created.
+However, the bean properties themselves are not set until the bean is actually created.
+Beans that are singleton-scoped and set to be pre-instantiated (the default) are created
+when the container is created. Scopes are defined in xref:beans:beans-factory-scopes.adoc#beans-factory-scopes[beans-factory-scopes]. Otherwise,
+the bean is created only when it is requested. Creation of a bean potentially causes a
+graph of beans to be created, as the bean's dependencies and its dependencies'
+dependencies (and so on) are created and assigned. Note that resolution mismatches among
+those dependencies may show up late -- that is, on first creation of the affected bean.
+
+.Circular dependencies
+****
+If you use predominantly constructor injection, it is possible to create an unresolvable
+circular dependency scenario.
+
+For example: Class A requires an instance of class B through constructor injection, and
+class B requires an instance of class A through constructor injection. If you configure
+beans for classes A and B to be injected into each other, the Spring IoC container
+detects this circular reference at runtime, and throws a
+`BeanCurrentlyInCreationException`.
+
+One possible solution is to edit the source code of some classes to be configured by
+setters rather than constructors. Alternatively, avoid constructor injection and use
+setter injection only. In other words, although it is not recommended, you can configure
+circular dependencies with setter injection.
+
+Unlike the typical case (with no circular dependencies), a circular dependency
+between bean A and bean B forces one of the beans to be injected into the other prior to
+being fully initialized itself (a classic chicken-and-egg scenario).
+****
+
+You can generally trust Spring to do the right thing. It detects configuration problems,
+such as references to non-existent beans and circular dependencies, at container
+load-time. Spring sets properties and resolves dependencies as late as possible, when
+the bean is actually created. This means that a Spring container that has loaded
+correctly can later generate an exception when you request an object if there is a
+problem creating that object or one of its dependencies -- for example, the bean throws an
+exception as a result of a missing or invalid property. This potentially delayed
+visibility of some configuration issues is why `ApplicationContext` implementations by
+default pre-instantiate singleton beans. At the cost of some upfront time and memory to
+create these beans before they are actually needed, you discover configuration issues
+when the `ApplicationContext` is created, not later. You can still override this default
+behavior so that singleton beans initialize lazily, rather than being pre-instantiated.
+
+If no circular dependencies exist, when one or more collaborating beans are being
+injected into a dependent bean, each collaborating bean is totally configured prior
+to being injected into the dependent bean. This means that, if bean A has a dependency on
+bean B, the Spring IoC container completely configures bean B prior to invoking the
+setter method on bean A. In other words, the bean is instantiated (if it is not a
+pre-instantiated singleton), its dependencies are set, and the relevant lifecycle
+methods (such as a xref:beans:beans-factory-nature:beans-factory-lifecycle.adoc#beans-factory-lifecycle-initializingbean[configured init method]
+or the xref:beans:beans-factory-nature:beans-factory-lifecycle.adoc#beans-factory-lifecycle-initializingbean[InitializingBean callback method])
+are invoked.
+
+
+[[beans-some-examples]]
+==== Examples of Dependency Injection
+
+The following example uses XML-based configuration metadata for setter-based DI. A small
+part of a Spring XML configuration file specifies some bean definitions as follows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean">
+		<!-- setter injection using the nested ref element -->
+		<property name="beanOne">
+			<ref bean="anotherExampleBean"/>
+		</property>
+
+		<!-- setter injection using the neater ref attribute -->
+		<property name="beanTwo" ref="yetAnotherBean"/>
+		<property name="integerProperty" value="1"/>
+	</bean>
+
+	<bean id="anotherExampleBean" class="examples.AnotherBean"/>
+	<bean id="yetAnotherBean" class="examples.YetAnotherBean"/>
+----
+
+The following example shows the corresponding `ExampleBean` class:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class ExampleBean {
+
+		private AnotherBean beanOne;
+
+		private YetAnotherBean beanTwo;
+
+		private int i;
+
+		public void setBeanOne(AnotherBean beanOne) {
+			this.beanOne = beanOne;
+		}
+
+		public void setBeanTwo(YetAnotherBean beanTwo) {
+			this.beanTwo = beanTwo;
+		}
+
+		public void setIntegerProperty(int i) {
+			this.i = i;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class ExampleBean {
+	lateinit var beanOne: AnotherBean
+	lateinit var beanTwo: YetAnotherBean
+	var i: Int = 0
+}
+----
+
+In the preceding example, setters are declared to match against the properties specified
+in the XML file. The following example uses constructor-based DI:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean">
+		<!-- constructor injection using the nested ref element -->
+		<constructor-arg>
+			<ref bean="anotherExampleBean"/>
+		</constructor-arg>
+
+		<!-- constructor injection using the neater ref attribute -->
+		<constructor-arg ref="yetAnotherBean"/>
+
+		<constructor-arg type="int" value="1"/>
+	</bean>
+
+	<bean id="anotherExampleBean" class="examples.AnotherBean"/>
+	<bean id="yetAnotherBean" class="examples.YetAnotherBean"/>
+----
+
+The following example shows the corresponding `ExampleBean` class:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class ExampleBean {
+
+		private AnotherBean beanOne;
+
+		private YetAnotherBean beanTwo;
+
+		private int i;
+
+		public ExampleBean(
+			AnotherBean anotherBean, YetAnotherBean yetAnotherBean, int i) {
+			this.beanOne = anotherBean;
+			this.beanTwo = yetAnotherBean;
+			this.i = i;
+		}
+	}
+----
+[source,java,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class ExampleBean(
+		private val beanOne: AnotherBean,
+		private val beanTwo: YetAnotherBean,
+		private val i: Int)
+----
+
+The constructor arguments specified in the bean definition are used as arguments to
+the constructor of the `ExampleBean`.
+
+Now consider a variant of this example, where, instead of using a constructor, Spring is
+told to call a `static` factory method to return an instance of the object:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="exampleBean" class="examples.ExampleBean" factory-method="createInstance">
+		<constructor-arg ref="anotherExampleBean"/>
+		<constructor-arg ref="yetAnotherBean"/>
+		<constructor-arg value="1"/>
+	</bean>
+
+	<bean id="anotherExampleBean" class="examples.AnotherBean"/>
+	<bean id="yetAnotherBean" class="examples.YetAnotherBean"/>
+----
+
+The following example shows the corresponding `ExampleBean` class:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class ExampleBean {
+
+		// a private constructor
+		private ExampleBean(...) {
+			...
+		}
+
+		// a static factory method; the arguments to this method can be
+		// considered the dependencies of the bean that is returned,
+		// regardless of how those arguments are actually used.
+		public static ExampleBean createInstance (
+			AnotherBean anotherBean, YetAnotherBean yetAnotherBean, int i) {
+
+			ExampleBean eb = new ExampleBean (...);
+			// some other operations...
+			return eb;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class ExampleBean private constructor() {
+		companion object {
+			// a static factory method; the arguments to this method can be
+			// considered the dependencies of the bean that is returned,
+			// regardless of how those arguments are actually used.
+			fun createInstance(anotherBean: AnotherBean, yetAnotherBean: YetAnotherBean, i: Int): ExampleBean {
+				val eb = ExampleBean (...)
+				// some other operations...
+				return eb
+			}
+		}
+	}
+----
+
+Arguments to the `static` factory method are supplied by `<constructor-arg/>` elements,
+exactly the same as if a constructor had actually been used. The type of the class being
+returned by the factory method does not have to be of the same type as the class that
+contains the `static` factory method (although, in this example, it is). An instance
+(non-static) factory method can be used in an essentially identical fashion (aside
+from the use of the `factory-bean` attribute instead of the `class` attribute), so we
+do not discuss those details here.
+
+
+
+[[beans-factory-properties-detailed]]
+=== Dependencies and Configuration in Detail
+
+As mentioned in the xref:beans:beans-dependencies:beans-factory-collaborators.adoc#beans-factory-collaborators[previous section], you can define bean
+properties and constructor arguments as references to other managed beans (collaborators)
+or as values defined inline. Spring's XML-based configuration metadata supports
+sub-element types within its `<property/>` and `<constructor-arg/>` elements for this
+purpose.
+
+
+[[beans-value-element]]
+==== Straight Values (Primitives, Strings, and so on)
+
+The `value` attribute of the `<property/>` element specifies a property or constructor
+argument as a human-readable string representation. Spring's
+xref:validation:core-convert:core-convert-GenericConverter-SPI.adoc#core-convert-ConversionService-API[conversion service] is used to convert these
+values from a `String` to the actual type of the property or argument.
+The following example shows various values being set:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="myDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<!-- results in a setDriverClassName(String) call -->
+		<property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+		<property name="url" value="jdbc:mysql://localhost:3306/mydb"/>
+		<property name="username" value="root"/>
+		<property name="password" value="masterkaoli"/>
+	</bean>
+----
+
+The following example uses the xref:beans:beans-dependencies:beans-factory-properties-detailed.adoc#beans-p-namespace[p-namespace] for even more succinct
+XML configuration:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:p="http://www.springframework.org/schema/p"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+		https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean id="myDataSource" class="org.apache.commons.dbcp.BasicDataSource"
+			destroy-method="close"
+			p:driverClassName="com.mysql.jdbc.Driver"
+			p:url="jdbc:mysql://localhost:3306/mydb"
+			p:username="root"
+			p:password="masterkaoli"/>
+
+	</beans>
+----
+
+The preceding XML is more succinct. However, typos are discovered at runtime rather than
+design time, unless you use an IDE (such as https://www.jetbrains.com/idea/[IntelliJ
+IDEA] or the https://spring.io/tools/sts[Spring Tool Suite])
+that supports automatic property completion when you create bean definitions. Such IDE
+assistance is highly recommended.
+
+You can also configure a `java.util.Properties` instance, as follows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="mappings"
+		class="org.springframework.context.support.PropertySourcesPlaceholderConfigurer">
+
+		<!-- typed as a java.util.Properties -->
+		<property name="properties">
+			<value>
+				jdbc.driver.className=com.mysql.jdbc.Driver
+				jdbc.url=jdbc:mysql://localhost:3306/mydb
+			</value>
+		</property>
+	</bean>
+----
+
+The Spring container converts the text inside the `<value/>` element into a
+`java.util.Properties` instance by using the JavaBeans `PropertyEditor` mechanism. This
+is a nice shortcut, and is one of a few places where the Spring team do favor the use of
+the nested `<value/>` element over the `value` attribute style.
+
+[[beans-idref-element]]
+===== The `idref` element
+
+The `idref` element is simply an error-proof way to pass the `id` (a string value - not
+a reference) of another bean in the container to a `<constructor-arg/>` or `<property/>`
+element. The following example shows how to use it:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="theTargetBean" class="..."/>
+
+	<bean id="theClientBean" class="...">
+		<property name="targetName">
+			<idref bean="theTargetBean"/>
+		</property>
+	</bean>
+----
+
+The preceding bean definition snippet is exactly equivalent (at runtime) to the
+following snippet:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="theTargetBean" class="..." />
+
+	<bean id="client" class="...">
+		<property name="targetName" value="theTargetBean"/>
+	</bean>
+----
+
+The first form is preferable to the second, because using the `idref` tag lets the
+container validate at deployment time that the referenced, named bean actually
+exists. In the second variation, no validation is performed on the value that is passed
+to the `targetName` property of the `client` bean. Typos are only discovered (with most
+likely fatal results) when the `client` bean is actually instantiated. If the `client`
+bean is a xref:beans:beans-factory-scopes.adoc#beans-factory-scopes[prototype] bean, this typo and the resulting exception
+may only be discovered long after the container is deployed.
+
+NOTE: The `local` attribute on the `idref` element is no longer supported in the 4.0 beans
+XSD, since it does not provide value over a regular `bean` reference any more. Change
+your existing `idref local` references to `idref bean` when upgrading to the 4.0 schema.
+
+A common place (at least in versions earlier than Spring 2.0) where the `<idref/>` element
+brings value is in the configuration of xref:aop-api:aop-pfb:aop-pfb-1.adoc#aop-pfb-1[AOP interceptors] in a
+`ProxyFactoryBean` bean definition. Using `<idref/>` elements when you specify the
+interceptor names prevents you from misspelling an interceptor ID.
+
+
+[[beans-ref-element]]
+==== References to Other Beans (Collaborators)
+
+The `ref` element is the final element inside a `<constructor-arg/>` or `<property/>`
+definition element. Here, you set the value of the specified property of a bean to be a
+reference to another bean (a collaborator) managed by the container. The referenced bean
+is a dependency of the bean whose property is to be set, and it is initialized on demand
+as needed before the property is set. (If the collaborator is a singleton bean, it may
+already be initialized by the container.) All references are ultimately a reference to
+another object. Scoping and validation depend on whether you specify the ID or name of the
+other object through the `bean`, `local,` or `parent` attributes.
+
+Specifying the target bean through the `bean` attribute of the `<ref/>` tag is the most
+general form and allows creation of a reference to any bean in the same container or
+parent container, regardless of whether it is in the same XML file. The value of the
+`bean` attribute may be the same as the `id` attribute of the target bean or be the same
+as one of the values in the `name` attribute of the target bean. The following example
+shows how to use a `ref` element:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<ref bean="someBean"/>
+----
+
+Specifying the target bean through the `parent` attribute creates a reference to a bean
+that is in a parent container of the current container. The value of the `parent`
+attribute may be the same as either the `id` attribute of the target bean or one of the
+values in the `name` attribute of the target bean. The target bean must be in a
+parent container of the current one. You should use this bean reference variant mainly
+when you have a hierarchy of containers and you want to wrap an existing bean in a parent
+container with a proxy that has the same name as the parent bean. The following pair of
+listings shows how to use the `parent` attribute:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<!-- in the parent context -->
+	<bean id="accountService" class="com.something.SimpleAccountService">
+		<!-- insert dependencies as required as here -->
+	</bean>
+----
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<!-- in the child (descendant) context -->
+	<bean id="accountService" <!-- bean name is the same as the parent bean -->
+		class="org.springframework.aop.framework.ProxyFactoryBean">
+		<property name="target">
+			<ref parent="accountService"/> <!-- notice how we refer to the parent bean -->
+		</property>
+		<!-- insert other configuration and dependencies as required here -->
+	</bean>
+----
+
+NOTE: The `local` attribute on the `ref` element is no longer supported in the 4.0 beans
+XSD, since it does not provide value over a regular `bean` reference any more. Change
+your existing `ref local` references to `ref bean` when upgrading to the 4.0 schema.
+
+
+[[beans-inner-beans]]
+==== Inner Beans
+
+A `<bean/>` element inside the `<property/>` or `<constructor-arg/>` elements defines an
+inner bean, as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="outer" class="...">
+		<!-- instead of using a reference to a target bean, simply define the target bean inline -->
+		<property name="target">
+			<bean class="com.example.Person"> <!-- this is the inner bean -->
+				<property name="name" value="Fiona Apple"/>
+				<property name="age" value="25"/>
+			</bean>
+		</property>
+	</bean>
+----
+
+An inner bean definition does not require a defined ID or name. If specified, the container
+does not use such a value as an identifier. The container also ignores the `scope` flag on
+creation, because inner beans are always anonymous and are always created with the outer
+bean. It is not possible to access inner beans independently or to inject them into
+collaborating beans other than into the enclosing bean.
+
+As a corner case, it is possible to receive destruction callbacks from a custom scope --
+for example, for a request-scoped inner bean contained within a singleton bean. The creation
+of the inner bean instance is tied to its containing bean, but destruction callbacks let it
+participate in the request scope's lifecycle. This is not a common scenario. Inner beans
+typically simply share their containing bean's scope.
+
+
+[[beans-collection-elements]]
+==== Collections
+
+The `<list/>`, `<set/>`, `<map/>`, and `<props/>` elements set the properties
+and arguments of the Java `Collection` types `List`, `Set`, `Map`, and `Properties`,
+respectively. The following example shows how to use them:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="moreComplexObject" class="example.ComplexObject">
+		<!-- results in a setAdminEmails(java.util.Properties) call -->
+		<property name="adminEmails">
+			<props>
+				<prop key="administrator">administrator@example.org</prop>
+				<prop key="support">support@example.org</prop>
+				<prop key="development">development@example.org</prop>
+			</props>
+		</property>
+		<!-- results in a setSomeList(java.util.List) call -->
+		<property name="someList">
+			<list>
+				<value>a list element followed by a reference</value>
+				<ref bean="myDataSource" />
+			</list>
+		</property>
+		<!-- results in a setSomeMap(java.util.Map) call -->
+		<property name="someMap">
+			<map>
+				<entry key="an entry" value="just some string"/>
+				<entry key ="a ref" value-ref="myDataSource"/>
+			</map>
+		</property>
+		<!-- results in a setSomeSet(java.util.Set) call -->
+		<property name="someSet">
+			<set>
+				<value>just some string</value>
+				<ref bean="myDataSource" />
+			</set>
+		</property>
+	</bean>
+----
+
+The value of a map key or value, or a set value, can also be any of the
+following elements:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	bean | ref | idref | list | set | map | props | value | null
+----
+
+[[beans-collection-elements-merging]]
+===== Collection Merging
+
+The Spring container also supports merging collections. An application
+developer can define a parent `<list/>`, `<map/>`, `<set/>` or `<props/>` element
+and have child `<list/>`, `<map/>`, `<set/>` or `<props/>` elements inherit and
+override values from the parent collection. That is, the child collection's values are
+the result of merging the elements of the parent and child collections, with the child's
+collection elements overriding values specified in the parent collection.
+
+This section on merging discusses the parent-child bean mechanism. Readers unfamiliar
+with parent and child bean definitions may wish to read the
+xref:beans:beans-child-bean-definitions.adoc#beans-child-bean-definitions[relevant section] before continuing.
+
+The following example demonstrates collection merging:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="parent" abstract="true" class="example.ComplexObject">
+			<property name="adminEmails">
+				<props>
+					<prop key="administrator">administrator@example.com</prop>
+					<prop key="support">support@example.com</prop>
+				</props>
+			</property>
+		</bean>
+		<bean id="child" parent="parent">
+			<property name="adminEmails">
+				<!-- the merge is specified on the child collection definition -->
+				<props merge="true">
+					<prop key="sales">sales@example.com</prop>
+					<prop key="support">support@example.co.uk</prop>
+				</props>
+			</property>
+		</bean>
+	<beans>
+----
+
+Notice the use of the `merge=true` attribute on the `<props/>` element of the
+`adminEmails` property of the `child` bean definition. When the `child` bean is resolved
+and instantiated by the container, the resulting instance has an `adminEmails`
+`Properties` collection that contains the result of merging the child's
+`adminEmails` collection with the parent's `adminEmails` collection. The following listing
+shows the result:
+
+[literal,subs="verbatim,quotes"]
+----
+administrator=administrator@example.com
+sales=sales@example.com
+support=support@example.co.uk
+----
+
+The child `Properties` collection's value set inherits all property elements from the
+parent `<props/>`, and the child's value for the `support` value overrides the value in
+the parent collection.
+
+This merging behavior applies similarly to the `<list/>`, `<map/>`, and `<set/>`
+collection types. In the specific case of the `<list/>` element, the semantics
+associated with the `List` collection type (that is, the notion of an `ordered`
+collection of values) is maintained. The parent's values precede all of the child list's
+values. In the case of the `Map`, `Set`, and `Properties` collection types, no ordering
+exists. Hence, no ordering semantics are in effect for the collection types that underlie
+the associated `Map`, `Set`, and `Properties` implementation types that the container
+uses internally.
+
+[[beans-collection-merge-limitations]]
+===== Limitations of Collection Merging
+
+You cannot merge different collection types (such as a `Map` and a `List`). If you
+do attempt to do so, an appropriate `Exception` is thrown. The `merge` attribute must be
+specified on the lower, inherited, child definition. Specifying the `merge` attribute on
+a parent collection definition is redundant and does not result in the desired merging.
+
+[[beans-collection-elements-strongly-typed]]
+===== Strongly-typed collection
+
+With the introduction of generic types in Java 5, you can use strongly typed collections.
+That is, it is possible to declare a `Collection` type such that it can only contain
+(for example) `String` elements. If you use Spring to dependency-inject a
+strongly-typed `Collection` into a bean, you can take advantage of Spring's
+type-conversion support such that the elements of your strongly-typed `Collection`
+instances are converted to the appropriate type prior to being added to the `Collection`.
+The following Java class and bean definition show how to do so:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class SomeClass {
+
+		private Map<String, Float> accounts;
+
+		public void setAccounts(Map<String, Float> accounts) {
+			this.accounts = accounts;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+class SomeClass {
+	lateinit var accounts: Map<String, Float>
+}
+----
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="something" class="x.y.SomeClass">
+			<property name="accounts">
+				<map>
+					<entry key="one" value="9.99"/>
+					<entry key="two" value="2.75"/>
+					<entry key="six" value="3.99"/>
+				</map>
+			</property>
+		</bean>
+	</beans>
+----
+
+When the `accounts` property of the `something` bean is prepared for injection, the generics
+information about the element type of the strongly-typed `Map<String, Float>` is
+available by reflection. Thus, Spring's type conversion infrastructure recognizes the
+various value elements as being of type `Float`, and the string values (`9.99, 2.75`, and
+`3.99`) are converted into an actual `Float` type.
+
+
+[[beans-null-element]]
+==== Null and Empty String Values
+
+Spring treats empty arguments for properties and the like as empty `Strings`. The
+following XML-based configuration metadata snippet sets the `email` property to the empty
+`String` value ("").
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean class="ExampleBean">
+		<property name="email" value=""/>
+	</bean>
+----
+
+The preceding example is equivalent to the following Java code:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	exampleBean.setEmail("");
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	exampleBean.email = ""
+----
+
+
+The `<null/>` element handles `null` values. The following listing shows an example:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean class="ExampleBean">
+		<property name="email">
+			<null/>
+		</property>
+	</bean>
+----
+
+The preceding configuration is equivalent to the following Java code:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	exampleBean.setEmail(null);
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	exampleBean.email = null
+----
+
+
+[[beans-p-namespace]]
+==== XML Shortcut with the p-namespace
+
+The p-namespace lets you use the `bean` element's attributes (instead of nested
+`<property/>` elements) to describe your property values collaborating beans, or both.
+
+Spring supports extensible configuration formats xref:appendix:xsd-schemas.adoc#xsd-schemas[with namespaces],
+which are based on an XML Schema definition. The `beans` configuration format discussed in
+this chapter is defined in an XML Schema document. However, the p-namespace is not defined
+in an XSD file and exists only in the core of Spring.
+
+The following example shows two XML snippets (the first uses
+standard XML format and the second uses the p-namespace) that resolve to the same result:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:p="http://www.springframework.org/schema/p"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean name="classic" class="com.example.ExampleBean">
+			<property name="email" value="someone@somewhere.com"/>
+		</bean>
+
+		<bean name="p-namespace" class="com.example.ExampleBean"
+			p:email="someone@somewhere.com"/>
+	</beans>
+----
+
+The example shows an attribute in the p-namespace called `email` in the bean definition.
+This tells Spring to include a property declaration. As previously mentioned, the
+p-namespace does not have a schema definition, so you can set the name of the attribute
+to the property name.
+
+This next example includes two more bean definitions that both have a reference to
+another bean:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:p="http://www.springframework.org/schema/p"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean name="john-classic" class="com.example.Person">
+			<property name="name" value="John Doe"/>
+			<property name="spouse" ref="jane"/>
+		</bean>
+
+		<bean name="john-modern"
+			class="com.example.Person"
+			p:name="John Doe"
+			p:spouse-ref="jane"/>
+
+		<bean name="jane" class="com.example.Person">
+			<property name="name" value="Jane Doe"/>
+		</bean>
+	</beans>
+----
+
+This example includes not only a property value using the p-namespace
+but also uses a special format to declare property references. Whereas the first bean
+definition uses `<property name="spouse" ref="jane"/>` to create a reference from bean
+`john` to bean `jane`, the second bean definition uses `p:spouse-ref="jane"` as an
+attribute to do the exact same thing. In this case, `spouse` is the property name,
+whereas the `-ref` part indicates that this is not a straight value but rather a
+reference to another bean.
+
+NOTE: The p-namespace is not as flexible as the standard XML format. For example, the format
+for declaring property references clashes with properties that end in `Ref`, whereas the
+standard XML format does not. We recommend that you choose your approach carefully and
+communicate this to your team members to avoid producing XML documents that use all
+three approaches at the same time.
+
+
+[[beans-c-namespace]]
+==== XML Shortcut with the c-namespace
+
+Similar to the xref:beans:beans-dependencies:beans-factory-properties-detailed.adoc#beans-p-namespace[beans-p-namespace], the c-namespace, introduced in Spring
+3.1, allows inlined attributes for configuring the constructor arguments rather
+then nested `constructor-arg` elements.
+
+The following example uses the `c:` namespace to do the same thing as the from
+xref:beans:beans-dependencies:beans-factory-collaborators.adoc#beans-constructor-injection[beans-constructor-injection]:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:c="http://www.springframework.org/schema/c"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+			https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+		<bean id="beanTwo" class="x.y.ThingTwo"/>
+		<bean id="beanThree" class="x.y.ThingThree"/>
+
+		<!-- traditional declaration with optional argument names -->
+		<bean id="beanOne" class="x.y.ThingOne">
+			<constructor-arg name="thingTwo" ref="beanTwo"/>
+			<constructor-arg name="thingThree" ref="beanThree"/>
+			<constructor-arg name="email" value="something@somewhere.com"/>
+		</bean>
+
+		<!-- c-namespace declaration with argument names -->
+		<bean id="beanOne" class="x.y.ThingOne" c:thingTwo-ref="beanTwo"
+			c:thingThree-ref="beanThree" c:email="something@somewhere.com"/>
+
+	</beans>
+----
+
+The `c:` namespace uses the same conventions as the `p:` one (a trailing `-ref` for
+bean references) for setting the constructor arguments by their names. Similarly,
+it needs to be declared in the XML file even though it is not defined in an XSD schema
+(it exists inside the Spring core).
+
+For the rare cases where the constructor argument names are not available (usually if
+the bytecode was compiled without debugging information), you can use fallback to the
+argument indexes, as follows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<!-- c-namespace index declaration -->
+	<bean id="beanOne" class="x.y.ThingOne" c:_0-ref="beanTwo" c:_1-ref="beanThree"
+		c:_2="something@somewhere.com"/>
+----
+
+NOTE: Due to the XML grammar, the index notation requires the presence of the leading `_`,
+as XML attribute names cannot start with a number (even though some IDEs allow it).
+A corresponding index notation is also available for `<constructor-arg>` elements but
+not commonly used since the plain order of declaration is usually sufficient there.
+
+In practice, the constructor resolution
+xref:beans:beans-dependencies:beans-factory-collaborators.adoc#beans-factory-ctor-arguments-resolution[mechanism] is quite efficient in matching
+arguments, so unless you really need to, we recommend using the name notation
+through-out your configuration.
+
+
+[[beans-compound-property-names]]
+==== Compound Property Names
+
+You can use compound or nested property names when you set bean properties, as long as
+all components of the path except the final property name are not `null`. Consider the
+following bean definition:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="something" class="things.ThingOne">
+		<property name="fred.bob.sammy" value="123" />
+	</bean>
+----
+
+The `something` bean has a `fred` property, which has a `bob` property, which has a `sammy`
+property, and that final `sammy` property is being set to a value of `123`. In order for
+this to work, the `fred` property of `something` and the `bob` property of `fred` must not
+be `null` after the bean is constructed. Otherwise, a `NullPointerException` is thrown.
+
+
+
+[[beans-factory-dependson]]
+=== Using `depends-on`
+
+If a bean is a dependency of another bean, that usually means that one bean is set as a
+property of another. Typically you accomplish this with the <<beans-ref-element, `<ref/>`
+element>> in XML-based configuration metadata. However, sometimes dependencies between
+beans are less direct. An example is when a static initializer in a class needs to be
+triggered, such as for database driver registration. The `depends-on` attribute can
+explicitly force one or more beans to be initialized before the bean using this element
+is initialized. The following example uses the `depends-on` attribute to express a
+dependency on a single bean:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="beanOne" class="ExampleBean" depends-on="manager"/>
+	<bean id="manager" class="ManagerBean" />
+----
+
+To express a dependency on multiple beans, supply a list of bean names as the value of
+the `depends-on` attribute (commas, whitespace, and semicolons are valid
+delimiters):
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="beanOne" class="ExampleBean" depends-on="manager,accountDao">
+		<property name="manager" ref="manager" />
+	</bean>
+
+	<bean id="manager" class="ManagerBean" />
+	<bean id="accountDao" class="x.y.jdbc.JdbcAccountDao" />
+----
+
+NOTE: The `depends-on` attribute can specify both an initialization-time dependency and,
+in the case of xref:beans:beans-factory-scopes:beans-factory-scopes-singleton.adoc#beans-factory-scopes-singleton[singleton] beans only, a corresponding
+destruction-time dependency. Dependent beans that define a `depends-on` relationship
+with a given bean are destroyed first, prior to the given bean itself being destroyed.
+Thus, `depends-on` can also control shutdown order.
+
+
+
+[[beans-factory-lazy-init]]
+=== Lazy-initialized Beans
+
+By default, `ApplicationContext` implementations eagerly create and configure all
+xref:beans:beans-factory-scopes:beans-factory-scopes-singleton.adoc#beans-factory-scopes-singleton[singleton] beans as part of the initialization
+process. Generally, this pre-instantiation is desirable, because errors in the
+configuration or surrounding environment are discovered immediately, as opposed to hours
+or even days later. When this behavior is not desirable, you can prevent
+pre-instantiation of a singleton bean by marking the bean definition as being
+lazy-initialized. A lazy-initialized bean tells the IoC container to create a bean
+instance when it is first requested, rather than at startup.
+
+In XML, this behavior is controlled by the `lazy-init` attribute on the `<bean/>`
+element, as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="lazy" class="com.something.ExpensiveToCreateBean" lazy-init="true"/>
+	<bean name="not.lazy" class="com.something.AnotherBean"/>
+----
+
+When the preceding configuration is consumed by an `ApplicationContext`, the `lazy` bean
+is not eagerly pre-instantiated when the `ApplicationContext` starts,
+whereas the `not.lazy` bean is eagerly pre-instantiated.
+
+However, when a lazy-initialized bean is a dependency of a singleton bean that is
+not lazy-initialized, the `ApplicationContext` creates the lazy-initialized bean at
+startup, because it must satisfy the singleton's dependencies. The lazy-initialized bean
+is injected into a singleton bean elsewhere that is not lazy-initialized.
+
+You can also control lazy-initialization at the container level by using the
+`default-lazy-init` attribute on the `<beans/>` element, a the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans default-lazy-init="true">
+		<!-- no beans will be pre-instantiated... -->
+	</beans>
+----
+
+
+
+[[beans-factory-autowire]]
+=== Autowiring Collaborators
+
+The Spring container can autowire relationships between collaborating beans. You can
+let Spring resolve collaborators (other beans) automatically for your bean by
+inspecting the contents of the `ApplicationContext`. Autowiring has the following
+advantages:
+
+* Autowiring can significantly reduce the need to specify properties or constructor
+  arguments. (Other mechanisms such as a bean template
+  xref:beans:beans-child-bean-definitions.adoc#beans-child-bean-definitions[discussed elsewhere in this chapter] are also valuable
+  in this regard.)
+* Autowiring can update a configuration as your objects evolve. For example, if you need
+  to add a dependency to a class, that dependency can be satisfied automatically without
+  you needing to modify the configuration. Thus autowiring can be especially useful
+  during development, without negating the option of switching to explicit wiring when
+  the code base becomes more stable.
+
+When using XML-based configuration metadata (see xref:beans:beans-dependencies:beans-factory-collaborators.adoc#beans-factory-collaborators[beans-factory-collaborators]), you
+can specify the autowire mode for a bean definition with the `autowire` attribute of the
+`<bean/>` element. The autowiring functionality has four modes. You specify autowiring
+per bean and can thus choose which ones to autowire. The following table describes the
+four autowiring modes:
+
+[[beans-factory-autowiring-modes-tbl]]
+.Autowiring modes
+[cols="20%,80%"]
+|===
+| Mode| Explanation
+
+| `no`
+| (Default) No autowiring. Bean references must be defined by `ref` elements. Changing
+  the default setting is not recommended for larger deployments, because specifying
+  collaborators explicitly gives greater control and clarity. To some extent, it
+  documents the structure of a system.
+
+| `byName`
+| Autowiring by property name. Spring looks for a bean with the same name as the
+  property that needs to be autowired. For example, if a bean definition is set to
+  autowire by name and it contains a `master` property (that is, it has a
+  `setMaster(..)` method), Spring looks for a bean definition named `master` and uses
+  it to set the property.
+
+| `byType`
+| Lets a property be autowired if exactly one bean of the property type exists in
+  the container. If more than one exists, a fatal exception is thrown, which indicates
+  that you may not use `byType` autowiring for that bean. If there are no matching
+  beans, nothing happens (the property is not set).
+
+| `constructor`
+| Analogous to `byType` but applies to constructor arguments. If there is not exactly
+  one bean of the constructor argument type in the container, a fatal error is raised.
+|===
+
+With `byType` or `constructor` autowiring mode, you can wire arrays and
+typed collections. In such cases, all autowire candidates within the container that
+match the expected type are provided to satisfy the dependency. You can autowire
+strongly-typed `Map` instances if the expected key type is `String`. An autowired `Map`
+instance's values consist of all bean instances that match the expected type, and the
+`Map` instance's keys contain the corresponding bean names.
+
+
+[[beans-autowired-exceptions]]
+==== Limitations and Disadvantages of Autowiring
+
+Autowiring works best when it is used consistently across a project. If autowiring is
+not used in general, it might be confusing to developers to use it to wire only one or
+two bean definitions.
+
+Consider the limitations and disadvantages of autowiring:
+
+* Explicit dependencies in `property` and `constructor-arg` settings always override
+  autowiring. You cannot autowire simple properties such as primitives,
+  `Strings`, and `Classes` (and arrays of such simple properties). This limitation is
+  by-design.
+* Autowiring is less exact than explicit wiring. Although, as noted in the earlier table,
+  Spring is careful to avoid guessing in case of ambiguity that might have unexpected
+  results. The relationships between your Spring-managed objects are no longer
+  documented explicitly.
+* Wiring information may not be available to tools that may generate documentation from
+  a Spring container.
+* Multiple bean definitions within the container may match the type specified by the
+  setter method or constructor argument to be autowired. For arrays, collections, or
+  `Map` instances, this is not necessarily a problem. However, for dependencies that
+  expect a single value, this ambiguity is not arbitrarily resolved. If no unique bean
+  definition is available, an exception is thrown.
+
+In the latter scenario, you have several options:
+
+* Abandon autowiring in favor of explicit wiring.
+* Avoid autowiring for a bean definition by setting its `autowire-candidate` attributes
+  to `false`, as described in the xref:beans:beans-dependencies:beans-factory-autowire.adoc#beans-factory-autowire-candidate[next section].
+* Designate a single bean definition as the primary candidate by setting the
+  `primary` attribute of its `<bean/>` element to `true`.
+* Implement the more fine-grained control available with annotation-based configuration,
+  as described in xref:beans:beans-annotation-config.adoc#beans-annotation-config[beans-annotation-config].
+
+
+
+[[beans-factory-autowire-candidate]]
+==== Excluding a Bean from Autowiring
+
+On a per-bean basis, you can exclude a bean from autowiring. In Spring's XML format, set
+the `autowire-candidate` attribute of the `<bean/>` element to `false`. The container
+makes that specific bean definition unavailable to the autowiring infrastructure
+(including annotation style configurations such as xref:beans:beans-annotation-config:beans-autowired-annotation.adoc#beans-autowired-annotation[`@Autowired`]).
+
+NOTE: The `autowire-candidate` attribute is designed to only affect type-based autowiring.
+It does not affect explicit references by name, which get resolved even if the
+specified bean is not marked as an autowire candidate. As a consequence, autowiring
+by name nevertheless injects a bean if the name matches.
+
+You can also limit autowire candidates based on pattern-matching against bean names. The
+top-level `<beans/>` element accepts one or more patterns within its
+`default-autowire-candidates` attribute. For example, to limit autowire candidate status
+to any bean whose name ends with `Repository`, provide a value of `*Repository`. To
+provide multiple patterns, define them in a comma-separated list. An explicit value of
+`true` or `false` for a bean definition's `autowire-candidate` attribute always takes
+precedence. For such beans, the pattern matching rules do not apply.
+
+These techniques are useful for beans that you never want to be injected into other
+beans by autowiring. It does not mean that an excluded bean cannot itself be configured by
+using autowiring. Rather, the bean itself is not a candidate for autowiring other beans.
+
+
+
+[[beans-factory-method-injection]]
+=== Method Injection
+
+In most application scenarios, most beans in the container are
+xref:beans:beans-factory-scopes:beans-factory-scopes-singleton.adoc#beans-factory-scopes-singleton[singletons]. When a singleton bean needs to
+collaborate with another singleton bean or a non-singleton bean needs to collaborate
+with another non-singleton bean, you typically handle the dependency by defining one
+bean as a property of the other. A problem arises when the bean lifecycles are
+different. Suppose singleton bean A needs to use non-singleton (prototype) bean B,
+perhaps on each method invocation on A. The container creates the singleton bean A only
+once, and thus only gets one opportunity to set the properties. The container cannot
+provide bean A with a new instance of bean B every time one is needed.
+
+A solution is to forego some inversion of control. You can <<beans-factory-aware,make
+bean A aware of the container>> by implementing the `ApplicationContextAware` interface,
+and by xref:beans:beans-basics:beans-factory-client.adoc#beans-factory-client[making a `getBean("B")` call to the container] ask for (a
+typically new) bean B instance every time bean A needs it. The following example
+shows this approach:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	// a class that uses a stateful Command-style class to perform some processing
+	package fiona.apple;
+
+	// Spring-API imports
+	import org.springframework.beans.BeansException;
+	import org.springframework.context.ApplicationContext;
+	import org.springframework.context.ApplicationContextAware;
+
+	public class CommandManager implements ApplicationContextAware {
+
+		private ApplicationContext applicationContext;
+
+		public Object process(Map commandState) {
+			// grab a new instance of the appropriate Command
+			Command command = createCommand();
+			// set the state on the (hopefully brand new) Command instance
+			command.setState(commandState);
+			return command.execute();
+		}
+
+		protected Command createCommand() {
+			// notice the Spring API dependency!
+			return this.applicationContext.getBean("command", Command.class);
+		}
+
+		public void setApplicationContext(
+				ApplicationContext applicationContext) throws BeansException {
+			this.applicationContext = applicationContext;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	// a class that uses a stateful Command-style class to perform some processing
+	package fiona.apple
+
+	// Spring-API imports
+	import org.springframework.context.ApplicationContext
+	import org.springframework.context.ApplicationContextAware
+
+	class CommandManager : ApplicationContextAware {
+
+		private lateinit var applicationContext: ApplicationContext
+
+		fun process(commandState: Map<*, *>): Any {
+			// grab a new instance of the appropriate Command
+			val command = createCommand()
+			// set the state on the (hopefully brand new) Command instance
+			command.state = commandState
+			return command.execute()
+		}
+
+		// notice the Spring API dependency!
+		protected fun createCommand() =
+				applicationContext.getBean("command", Command::class.java)
+
+		override fun setApplicationContext(applicationContext: ApplicationContext) {
+			this.applicationContext = applicationContext
+		}
+	}
+----
+
+The preceding is not desirable, because the business code is aware of and coupled to the
+Spring Framework. Method Injection, a somewhat advanced feature of the Spring IoC
+container, lets you handle this use case cleanly.
+
+****
+You can read more about the motivation for Method Injection in
+https://spring.io/blog/2004/08/06/method-injection/[this blog entry].
+****
+
+
+
+[[beans-factory-lookup-method-injection]]
+==== Lookup Method Injection
+
+Lookup method injection is the ability of the container to override methods on
+container-managed beans and return the lookup result for another named bean in the
+container. The lookup typically involves a prototype bean, as in the scenario described
+in xref:beans:beans-dependencies:beans-factory-method-injection.adoc#beans-factory-method-injection[the preceding section]. The Spring Framework
+implements this method injection by using bytecode generation from the CGLIB library to
+dynamically generate a subclass that overrides the method.
+
+[NOTE]
+====
+* For this dynamic subclassing to work, the class that the Spring bean container
+  subclasses cannot be `final`, and the method to be overridden cannot be `final`, either.
+* Unit-testing a class that has an `abstract` method requires you to subclass the class
+  yourself and to supply a stub implementation of the `abstract` method.
+* Concrete methods are also necessary for component scanning, which requires concrete
+  classes to pick up.
+* A further key limitation is that lookup methods do not work with factory methods and
+  in particular not with `@Bean` methods in configuration classes, since, in that case,
+  the container is not in charge of creating the instance and therefore cannot create
+  a runtime-generated subclass on the fly.
+====
+
+In the case of the `CommandManager` class in the previous code snippet, the
+Spring container dynamically overrides the implementation of the `createCommand()`
+method. The `CommandManager` class does not have any Spring dependencies, as
+the reworked example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	package fiona.apple;
+
+	// no more Spring imports!
+
+	public abstract class CommandManager {
+
+		public Object process(Object commandState) {
+			// grab a new instance of the appropriate Command interface
+			Command command = createCommand();
+			// set the state on the (hopefully brand new) Command instance
+			command.setState(commandState);
+			return command.execute();
+		}
+
+		// okay... but where is the implementation of this method?
+		protected abstract Command createCommand();
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	package fiona.apple
+
+	// no more Spring imports!
+
+	abstract class CommandManager {
+
+		fun process(commandState: Any): Any {
+			// grab a new instance of the appropriate Command interface
+			val command = createCommand()
+			// set the state on the (hopefully brand new) Command instance
+			command.state = commandState
+			return command.execute()
+		}
+
+		// okay... but where is the implementation of this method?
+		protected abstract fun createCommand(): Command
+	}
+----
+
+In the client class that contains the method to be injected (the `CommandManager` in this
+case), the method to be injected requires a signature of the following form:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<public|protected> [abstract] <return-type> theMethodName(no-arguments);
+----
+
+If the method is `abstract`, the dynamically-generated subclass implements the method.
+Otherwise, the dynamically-generated subclass overrides the concrete method defined in
+the original class. Consider the following example:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<!-- a stateful bean deployed as a prototype (non-singleton) -->
+	<bean id="myCommand" class="fiona.apple.AsyncCommand" scope="prototype">
+		<!-- inject dependencies here as required -->
+	</bean>
+
+	<!-- commandProcessor uses statefulCommandHelper -->
+	<bean id="commandManager" class="fiona.apple.CommandManager">
+		<lookup-method name="createCommand" bean="myCommand"/>
+	</bean>
+----
+
+The bean identified as `commandManager` calls its own `createCommand()` method
+whenever it needs a new instance of the `myCommand` bean. You must be careful to deploy
+the `myCommand` bean as a prototype if that is actually what is needed. If it is
+a xref:beans:beans-factory-scopes:beans-factory-scopes-singleton.adoc#beans-factory-scopes-singleton[singleton], the same instance of the `myCommand`
+bean is returned each time.
+
+Alternatively, within the annotation-based component model, you can declare a lookup
+method through the `@Lookup` annotation, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public abstract class CommandManager {
+
+		public Object process(Object commandState) {
+			Command command = createCommand();
+			command.setState(commandState);
+			return command.execute();
+		}
+
+		@Lookup("myCommand")
+		protected abstract Command createCommand();
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	abstract class CommandManager {
+
+		fun process(commandState: Any): Any {
+			val command = createCommand()
+			command.state = commandState
+			return command.execute()
+		}
+
+		@Lookup("myCommand")
+		protected abstract fun createCommand(): Command
+	}
+----
+
+Or, more idiomatically, you can rely on the target bean getting resolved against the
+declared return type of the lookup method:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public abstract class CommandManager {
+
+		public Object process(Object commandState) {
+			MyCommand command = createCommand();
+			command.setState(commandState);
+			return command.execute();
+		}
+
+		@Lookup
+		protected abstract MyCommand createCommand();
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	abstract class CommandManager {
+
+		fun process(commandState: Any): Any {
+			val command = createCommand()
+			command.state = commandState
+			return command.execute()
+		}
+
+		@Lookup
+		protected abstract fun createCommand(): Command
+	}
+----
+
+Note that you should typically declare such annotated lookup methods with a concrete
+stub implementation, in order for them to be compatible with Spring's component
+scanning rules where abstract classes get ignored by default. This limitation does not
+apply to explicitly registered or explicitly imported bean classes.
+
+[TIP]
+====
+Another way of accessing differently scoped target beans is an `ObjectFactory`/
+`Provider` injection point. See xref:beans:beans-factory-scopes:beans-factory-scopes-other.adoc#beans-factory-scopes-other-injection[beans-factory-scopes-other-injection].
+
+You may also find the `ServiceLocatorFactoryBean` (in the
+`org.springframework.beans.factory.config` package) to be useful.
+====
+
+
+
+[[beans-factory-arbitrary-method-replacement]]
+==== Arbitrary Method Replacement
+
+A less useful form of method injection than lookup method injection is the ability to
+replace arbitrary methods in a managed bean with another method implementation. You
+can safely skip the rest of this section until you actually need this functionality.
+
+With XML-based configuration metadata, you can use the `replaced-method` element to
+replace an existing method implementation with another, for a deployed bean. Consider
+the following class, which has a method called `computeValue` that we want to override:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class MyValueCalculator {
+
+		public String computeValue(String input) {
+			// some real code...
+		}
+
+		// some other methods...
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class MyValueCalculator {
+
+		fun computeValue(input: String): String {
+			// some real code...
+		}
+
+		// some other methods...
+	}
+----
+
+A class that implements the `org.springframework.beans.factory.support.MethodReplacer`
+interface provides the new method definition, as the following example shows:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	/**
+	 * meant to be used to override the existing computeValue(String)
+	 * implementation in MyValueCalculator
+	 */
+	public class ReplacementComputeValue implements MethodReplacer {
+
+		public Object reimplement(Object o, Method m, Object[] args) throws Throwable {
+			// get the input value, work with it, and return a computed result
+			String input = (String) args[0];
+			...
+			return ...;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	/**
+	* meant to be used to override the existing computeValue(String)
+	* implementation in MyValueCalculator
+	*/
+	class ReplacementComputeValue : MethodReplacer {
+
+		override fun reimplement(obj: Any, method: Method, args: Array<out Any>): Any {
+			// get the input value, work with it, and return a computed result
+			val input = args[0] as String;
+			...
+			return ...;
+		}
+	}
+----
+
+
+
+The bean definition to deploy the original class and specify the method override would
+resemble the following example:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<bean id="myValueCalculator" class="x.y.z.MyValueCalculator">
+		<!-- arbitrary method replacement -->
+		<replaced-method name="computeValue" replacer="replacementComputeValue">
+			<arg-type>String</arg-type>
+		</replaced-method>
+	</bean>
+
+	<bean id="replacementComputeValue" class="a.b.c.ReplacementComputeValue"/>
+----
+
+You can use one or more `<arg-type/>` elements within the `<replaced-method/>`
+element to indicate the method signature of the method being overridden. The signature
+for the arguments is necessary only if the method is overloaded and multiple variants
+exist within the class. For convenience, the type string for an argument may be a
+substring of the fully qualified type name. For example, the following all match
+`java.lang.String`:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	java.lang.String
+	String
+	Str
+----
+
+Because the number of arguments is often enough to distinguish between each possible
+choice, this shortcut can save a lot of typing, by letting you type only the
+shortest string that matches an argument type.
+
+
+

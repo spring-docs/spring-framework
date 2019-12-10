@@ -1,0 +1,12 @@
+include::page$attributes.adoc[]
+[[dao]]
+== DAO Support
+
+The Data Access Object (DAO) support in Spring is aimed at making it easy to work with
+data access technologies (such as JDBC, Hibernate, or JPA) in a consistent way. This
+lets you switch between the aforementioned persistence technologies fairly easily,
+and it also lets you code without worrying about catching exceptions that are
+specific to each technology.
+
+
+

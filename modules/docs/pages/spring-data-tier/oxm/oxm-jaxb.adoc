@@ -1,0 +1,81 @@
+include::page$attributes.adoc[]
+[[oxm-jaxb]]
+=== JAXB
+
+The JAXB binding compiler translates a W3C XML Schema into one or more Java classes, a
+`jaxb.properties` file, and possibly some resource files. JAXB also offers a way to
+generate a schema from annotated Java classes.
+
+Spring supports the JAXB 2.0 API as XML marshalling strategies, following the
+`Marshaller` and `Unmarshaller` interfaces described in xref:oxm:oxm-marshaller-unmarshaller.adoc#oxm-marshaller-unmarshaller[oxm-marshaller-unmarshaller].
+The corresponding integration classes reside in the `org.springframework.oxm.jaxb`
+package.
+
+
+[[oxm-jaxb2]]
+==== Using `Jaxb2Marshaller`
+
+The `Jaxb2Marshaller` class implements both of Spring's `Marshaller` and `Unmarshaller`
+interfaces. It requires a context path to operate. You can set the context path by setting the
+`contextPath` property. The context path is a list of colon-separated Java package
+names that contain schema derived classes. It also offers a `classesToBeBound` property,
+which allows you to set an array of classes to be supported by the marshaller. Schema
+validation is performed by specifying one or more schema resources to the bean, as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="jaxb2Marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller">
+			<property name="classesToBeBound">
+				<list>
+					<value>org.springframework.oxm.jaxb.Flight</value>
+					<value>org.springframework.oxm.jaxb.Flights</value>
+				</list>
+			</property>
+			<property name="schema" value="classpath:org/springframework/oxm/schema.xsd"/>
+		</bean>
+
+		...
+
+	</beans>
+----
+
+[[oxm-jaxb2-xsd]]
+===== XML Configuration Namespace
+
+The `jaxb2-marshaller` element configures a `org.springframework.oxm.jaxb.Jaxb2Marshaller`,
+as the following example shows:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<oxm:jaxb2-marshaller id="marshaller" contextPath="org.springframework.ws.samples.airline.schema"/>
+----
+
+Alternatively, you can provide the list of classes to bind to the marshaller by using the
+`class-to-be-bound` child element:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<oxm:jaxb2-marshaller id="marshaller">
+		<oxm:class-to-be-bound name="org.springframework.ws.samples.airline.schema.Airport"/>
+		<oxm:class-to-be-bound name="org.springframework.ws.samples.airline.schema.Flight"/>
+		...
+	</oxm:jaxb2-marshaller>
+----
+
+The following table describes the available attributes:
+
+|===
+| Attribute| Description| Required
+
+| `id`
+| The ID of the marshaller
+| No
+
+| `contextPath`
+| The JAXB Context path
+| No
+|===
+
+
+

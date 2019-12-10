@@ -1,0 +1,23 @@
+include::page$attributes.adoc[]
+[[ejb]]
+== Enterprise JavaBeans (EJB) Integration
+
+As a lightweight container, Spring is often considered an EJB replacement. We do believe
+that for many, if not most, applications and use cases, Spring, as a container, combined
+with its rich supporting functionality in the area of transactions, ORM and JDBC access,
+is a better choice than implementing equivalent functionality through an EJB container
+and EJBs.
+
+However, it is important to note that using Spring does not prevent you from using EJBs.
+In fact, Spring makes it much easier to access EJBs and implement EJBs and functionality
+within them. Additionally, using Spring to access services provided by EJBs allows the
+implementation of those services to later transparently be switched between local EJB,
+remote EJB, or POJO (plain old Java object) variants, without the client code having to
+be changed.
+
+In this chapter, we look at how Spring can help you access and implement EJBs. Spring
+provides particular value when accessing stateless session beans (SLSBs), so we begin
+by discussing this topic.
+
+
+

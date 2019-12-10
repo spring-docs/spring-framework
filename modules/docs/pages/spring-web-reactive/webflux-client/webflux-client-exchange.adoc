@@ -1,0 +1,63 @@
+include::page$attributes.adoc[]
+[[webflux-client-exchange]]
+== `exchange()`
+
+The `exchange()` method provides more control than the `retrieve` method. The following example is equivalent
+to `retrieve()` but also provides access to the `ClientResponse`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Mono<Person> result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.exchange()
+			.flatMap(response -> response.bodyToMono(Person.class));
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.awaitExchange()
+			.awaitBody<Person>()
+----
+
+At this level, you can also create a full `ResponseEntity`:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	Mono<ResponseEntity<Person>> result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.exchange()
+			.flatMap(response -> response.toEntity(Person.class));
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	val result = client.get()
+			.uri("/persons/{id}", id).accept(MediaType.APPLICATION_JSON)
+			.awaitExchange()
+			.toEntity<Person>()
+----
+
+Note that (unlike `retrieve()`), with `exchange()`, there are no automatic error signals for
+4xx and 5xx responses. You have to check the status code and decide how to proceed.
+
+[CAUTION]
+====
+When using `exchange()`, you have to make sure that the body is always consumed or released,
+even when an exception occurs (see xref:databuffers:databuffers-using.adoc#databuffers-using[Using DataBuffer]).
+Typically, you do this by invoking either `bodyTo*` or `toEntity*` on `ClientResponse`
+to convert the body into an object of the desired type, but
+you can also invoke `releaseBody()` to discard the body contents without consuming it or
+`toBodilessEntity()` to get just the status and headers (while discarding the body).
+
+Finally, there is `bodyToMono(Void.class)`, which should only be used if no response content is
+expected.
+If the response does have content, the connection is closed and is not placed back in the pool,
+because it is not left in a reusable state.
+====
+
+
+

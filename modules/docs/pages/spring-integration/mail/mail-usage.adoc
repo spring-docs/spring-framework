@@ -1,0 +1,158 @@
+include::page$attributes.adoc[]
+[[mail-usage]]
+=== Usage
+
+Assume that we have a business interface called `OrderManager`, as the following example shows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface OrderManager {
+
+		void placeOrder(Order order);
+
+	}
+----
+
+Further assume that we have a requirement stating that an email message with an
+order number needs to be generated and sent to a customer who placed the relevant order.
+
+
+[[mail-usage-simple]]
+==== Basic `MailSender` and `SimpleMailMessage` Usage
+
+The following example shows how to use `MailSender` and `SimpleMailMessage` to send an
+email when someone places an order:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	import org.springframework.mail.MailException;
+	import org.springframework.mail.MailSender;
+	import org.springframework.mail.SimpleMailMessage;
+
+	public class SimpleOrderManager implements OrderManager {
+
+		private MailSender mailSender;
+		private SimpleMailMessage templateMessage;
+
+		public void setMailSender(MailSender mailSender) {
+			this.mailSender = mailSender;
+		}
+
+		public void setTemplateMessage(SimpleMailMessage templateMessage) {
+			this.templateMessage = templateMessage;
+		}
+
+		public void placeOrder(Order order) {
+
+			// Do the business calculations...
+
+			// Call the collaborators to persist the order...
+
+			// Create a thread safe "copy" of the template message and customize it
+			SimpleMailMessage msg = new SimpleMailMessage(this.templateMessage);
+			msg.setTo(order.getCustomer().getEmailAddress());
+			msg.setText(
+				"Dear " + order.getCustomer().getFirstName()
+					+ order.getCustomer().getLastName()
+					+ ", thank you for placing order. Your order number is "
+					+ order.getOrderNumber());
+			try{
+				this.mailSender.send(msg);
+			}
+			catch (MailException ex) {
+				// simply log it and go on...
+				System.err.println(ex.getMessage());
+			}
+		}
+
+	}
+----
+
+The following example shows the bean definitions for the preceding code:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="mailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="host" value="mail.mycompany.example"/>
+	</bean>
+
+	<!-- this is a template message that we can pre-load with default state -->
+	<bean id="templateMessage" class="org.springframework.mail.SimpleMailMessage">
+		<property name="from" value="customerservice@mycompany.example"/>
+		<property name="subject" value="Your order"/>
+	</bean>
+
+	<bean id="orderManager" class="com.mycompany.businessapp.support.SimpleOrderManager">
+		<property name="mailSender" ref="mailSender"/>
+		<property name="templateMessage" ref="templateMessage"/>
+	</bean>
+----
+
+
+[[mail-usage-mime]]
+==== Using `JavaMailSender` and `MimeMessagePreparator`
+
+This section describes another implementation of `OrderManager` that uses the `MimeMessagePreparator`
+callback interface. In the following example, the `mailSender` property is of type
+`JavaMailSender` so that we are able to use the JavaMail `MimeMessage` class:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	import javax.mail.Message;
+	import javax.mail.MessagingException;
+	import javax.mail.internet.InternetAddress;
+	import javax.mail.internet.MimeMessage;
+
+	import javax.mail.internet.MimeMessage;
+	import org.springframework.mail.MailException;
+	import org.springframework.mail.javamail.JavaMailSender;
+	import org.springframework.mail.javamail.MimeMessagePreparator;
+
+	public class SimpleOrderManager implements OrderManager {
+
+		private JavaMailSender mailSender;
+
+		public void setMailSender(JavaMailSender mailSender) {
+			this.mailSender = mailSender;
+		}
+
+		public void placeOrder(final Order order) {
+			// Do the business calculations...
+			// Call the collaborators to persist the order...
+
+			MimeMessagePreparator preparator = new MimeMessagePreparator() {
+				public void prepare(MimeMessage mimeMessage) throws Exception {
+					mimeMessage.setRecipient(Message.RecipientType.TO,
+							new InternetAddress(order.getCustomer().getEmailAddress()));
+					mimeMessage.setFrom(new InternetAddress("mail@mycompany.example"));
+					mimeMessage.setText("Dear " + order.getCustomer().getFirstName() + " " +
+							order.getCustomer().getLastName() + ", thanks for your order. " +
+							"Your order number is " + order.getOrderNumber() + ".");
+				}
+			};
+
+			try {
+				this.mailSender.send(preparator);
+			}
+			catch (MailException ex) {
+				// simply log it and go on...
+				System.err.println(ex.getMessage());
+			}
+		}
+
+	}
+----
+
+NOTE: The mail code is a crosscutting concern and could well be a candidate for
+refactoring into a xref:aop:aop.adoc#aop[custom Spring AOP aspect], which then could
+be executed at appropriate joinpoints on the `OrderManager` target.
+
+The Spring Framework's mail support ships with the standard JavaMail implementation.
+See the relevant javadoc for more information.
+
+
+

@@ -1,0 +1,11 @@
+include::page$attributes.adoc[]
+[[webflux-websocket]]
+= WebSockets
+[.small]#xref:websocket:websocket.adoc#websocket[Same as in the Servlet stack]#
+
+This part of the reference documentation covers support for reactive-stack WebSocket
+messaging.
+
+
+
+

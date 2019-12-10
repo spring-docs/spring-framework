@@ -1,0 +1,10 @@
+include::page$attributes.adoc[]
+[[rsocket]]
+= RSocket
+:gh-rsocket: https://github.com/rsocket
+:gh-rsocket-java: {gh-rsocket}/rsocket-java
+:gh-rsocket-extentions: {gh-rsocket}/rsocket/blob/master/Extensions
+
+This section describes Spring Framework's support for the RSocket protocol.
+
+

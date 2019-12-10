@@ -1,0 +1,24 @@
+include::page$attributes.adoc[]
+[[mvc]]
+= Spring Web MVC
+:doc-spring-security: {doc-root}/spring-security/site/docs/current/reference
+
+Spring Web MVC is the original web framework built on the Servlet API and has been included
+in the Spring Framework from the very beginning. The formal name, "`Spring Web MVC,`"
+comes from the name of its source module
+(https://github.com/spring-projects/spring-framework/tree/master/spring-webmvc[`spring-webmvc`]),
+but it is more commonly known as "`Spring MVC`".
+
+Parallel to Spring Web MVC, Spring Framework 5.0 introduced a reactive-stack web framework
+whose name, "`Spring WebFlux,`" is also based on its source module
+(https://github.com/spring-projects/spring-framework/tree/master/spring-webflux[`spring-webflux`]).
+This section covers Spring Web MVC. The xref:.adoc#spring-web-reactive[next section]
+covers Spring WebFlux.
+
+For baseline information and compatibility with Servlet container and Java EE version
+ranges, see the Spring Framework
+https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-Versions[Wiki].
+
+
+
+

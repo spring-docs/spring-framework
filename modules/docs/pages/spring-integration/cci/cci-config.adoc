@@ -1,0 +1,181 @@
+include::page$attributes.adoc[]
+[[cci-config]]
+=== Configuring CCI
+
+This section covers how to configure a Common Client Interface (CCI). It includes the
+following topics:
+
+* xref:cci:cci-config:cci-config-connector.adoc#cci-config-connector[cci-config-connector]
+* xref:cci:cci-config:cci-config-connectionfactory.adoc#cci-config-connectionfactory[cci-config-connectionfactory]
+* xref:cci:cci-config:cci-config-cci-connections.adoc#cci-config-cci-connections[cci-config-cci-connections]
+* xref:cci:cci-config:cci-config-single-connection.adoc#cci-config-single-connection[cci-config-single-connection]
+
+
+[[cci-config-connector]]
+==== Connector Configuration
+
+The base resource to use JCA CCI is the `ConnectionFactory` interface. The connector
+you use must provide an implementation of this interface.
+
+To use your connector, you can deploy it on your application server and fetch the
+`ConnectionFactory` from the server's JNDI environment (managed mode). The connector
+must be packaged as a RAR file (resource adapter archive) and contain a `ra.xml` file to
+describe its deployment characteristics. The actual name of the resource is specified
+when you deploy it. To access it within Spring, you can use Spring's
+`JndiObjectFactoryBean` or `<jee:jndi-lookup>` to fetch the factory by its JNDI name.
+
+Another way to use a connector is to embed it in your application (non-managed mode) and
+not use an application server to deploy and configure it. Spring offers the
+possibility to configure a connector as a bean, through a `FactoryBean` implementation called
+(`LocalConnectionFactoryBean`). In this manner, you only need the connector library in
+the classpath (no RAR file and no `ra.xml` descriptor needed). The library must be
+extracted from the connector's RAR file, if necessary.
+
+Once you have access to your `ConnectionFactory` instance, you can inject it into
+your components. These components can either be coded against the plain CCI API or
+use Spring's support classes for CCI access (e.g. `CciTemplate`).
+
+NOTE: When you use a connector in non-managed mode, you cannot use global transactions, because
+the resource is never enlisted or delisted in the current global transaction of the
+current thread. The resource is not aware of any global Java EE transactions that
+might be running.
+
+
+[[cci-config-connectionfactory]]
+==== `ConnectionFactory` Configuration in Spring
+
+To make connections to the EIS, you need to obtain a `ConnectionFactory` from
+the application server (if you are in a managed mode) or directly from Spring (if you are
+in a non-managed mode).
+
+In managed mode, you can access a `ConnectionFactory` from JNDI. Its properties are
+configured in the application server. The following example shows how to do so:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<jee:jndi-lookup id="eciConnectionFactory" jndi-name="eis/cicseci"/>
+----
+
+In non-managed mode, you must configure the `ConnectionFactory` you want to use in the
+configuration of Spring as a JavaBean. The `LocalConnectionFactoryBean` class offers
+this setup style, passing in the `ManagedConnectionFactory` implementation of your
+connector, exposing the application-level CCI `ConnectionFactory`. The following example
+shows how to do so:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="eciManagedConnectionFactory" class="com.ibm.connector2.cics.ECIManagedConnectionFactory">
+		<property name="serverName" value="TXSERIES"/>
+		<property name="connectionURL" value="tcp://localhost/"/>
+		<property name="portNumber" value="2006"/>
+	</bean>
+
+	<bean id="eciConnectionFactory" class="org.springframework.jca.support.LocalConnectionFactoryBean">
+		<property name="managedConnectionFactory" ref="eciManagedConnectionFactory"/>
+	</bean>
+----
+
+NOTE: You cannot directly instantiate a specific `ConnectionFactory`. You need to go through
+the corresponding implementation of the `ManagedConnectionFactory` interface for your
+connector. This interface is part of the JCA SPI specification.
+
+
+[[cci-config-cci-connections]]
+==== Configuring CCI Connections
+
+JCA CCI lets you configure the connections to the EIS by using the
+`ConnectionSpec` implementation of your connector. To configure its properties,
+you need to wrap the target connection factory with a dedicated adapter,
+`ConnectionSpecConnectionFactoryAdapter`. You can configure the dedicated `ConnectionSpec`
+with the `connectionSpec` property (as an inner bean).
+
+This property is not mandatory, because the CCI `ConnectionFactory` interface defines two
+different methods to obtain a CCI connection. You can often configure some of the `ConnectionSpec` properties
+in the application server (in managed mode) or on the
+corresponding local `ManagedConnectionFactory` implementation. The following listing
+shows the relevant parts of the `ConnectionFactory` interface definition:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface ConnectionFactory implements Serializable, Referenceable {
+		...
+		Connection getConnection() throws ResourceException;
+		Connection getConnection(ConnectionSpec connectionSpec) throws ResourceException;
+		...
+	}
+----
+
+Spring provides a `ConnectionSpecConnectionFactoryAdapter` that lets you specify a
+`ConnectionSpec` instance to use for all operations on a given factory. If the adapter's
+`connectionSpec` property is specified, the adapter uses the `getConnection` variant
+with the `ConnectionSpec` argument. Otherwise, the adapter uses the variant without that argument.
+The following example shows how to configure a `ConnectionSpecConnectionFactoryAdapter`:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="managedConnectionFactory"
+			class="com.sun.connector.cciblackbox.CciLocalTxManagedConnectionFactory">
+		<property name="connectionURL" value="jdbc:hsqldb:hsql://localhost:9001"/>
+		<property name="driverName" value="org.hsqldb.jdbcDriver"/>
+	</bean>
+
+	<bean id="targetConnectionFactory"
+			class="org.springframework.jca.support.LocalConnectionFactoryBean">
+		<property name="managedConnectionFactory" ref="managedConnectionFactory"/>
+	</bean>
+
+	<bean id="connectionFactory"
+			class="org.springframework.jca.cci.connection.ConnectionSpecConnectionFactoryAdapter">
+		<property name="targetConnectionFactory" ref="targetConnectionFactory"/>
+		<property name="connectionSpec">
+			<bean class="com.sun.connector.cciblackbox.CciConnectionSpec">
+				<property name="user" value="sa"/>
+				<property name="password" value=""/>
+			</bean>
+		</property>
+	</bean>
+----
+
+
+[[cci-config-single-connection]]
+==== Using a Single CCI Connection
+
+If you want to use a single CCI connection, Spring provides a further
+`ConnectionFactory` adapter to manage this. The `SingleConnectionFactory` adapter class
+lazily opens a single connection and closes it when this bean is destroyed at
+application shutdown. This class exposes special `Connection` proxies that behave
+accordingly, all sharing the same underlying physical connection. The following example
+shows how to use the `SingleConnectionFactory` adapter class:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<bean id="eciManagedConnectionFactory"
+			class="com.ibm.connector2.cics.ECIManagedConnectionFactory">
+		<property name="serverName" value="TEST"/>
+		<property name="connectionURL" value="tcp://localhost/"/>
+		<property name="portNumber" value="2006"/>
+	</bean>
+
+	<bean id="targetEciConnectionFactory"
+			class="org.springframework.jca.support.LocalConnectionFactoryBean">
+		<property name="managedConnectionFactory" ref="eciManagedConnectionFactory"/>
+	</bean>
+
+	<bean id="eciConnectionFactory"
+			class="org.springframework.jca.cci.connection.SingleConnectionFactory">
+		<property name="targetConnectionFactory" ref="targetEciConnectionFactory"/>
+	</bean>
+----
+
+NOTE: This `ConnectionFactory` adapter cannot directly be configured with a `ConnectionSpec`.
+You can use an intermediary `ConnectionSpecConnectionFactoryAdapter` that the
+`SingleConnectionFactory` talks to if you require a single connection for a specific
+`ConnectionSpec`.
+
+
+

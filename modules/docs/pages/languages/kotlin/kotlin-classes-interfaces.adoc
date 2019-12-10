@@ -1,0 +1,21 @@
+include::page$attributes.adoc[]
+[[kotlin-classes-interfaces]]
+== Classes and Interfaces
+
+The Spring Framework supports various Kotlin constructs, such as instantiating Kotlin classes
+through primary constructors, immutable classes data binding, and function optional parameters
+with default values.
+
+Kotlin parameter names are recognized through a dedicated `KotlinReflectionParameterNameDiscoverer`,
+which allows finding interface method parameter names without requiring the Java 8 `-parameters`
+compiler flag to be enabled during compilation.
+
+The https://github.com/FasterXML/jackson-module-kotlin[Jackson Kotlin module], which is required
+for serializing or deserializing JSON data, is automatically registered when
+found in the classpath, and a warning message is logged if Jackson and Kotlin are
+detected without the Jackson Kotlin module being present.
+
+You can declare configuration classes as
+https://kotlinlang.org/docs/reference/nested-classes.html[top level or nested but not inner],
+since the later requires a reference to the outer class.
+

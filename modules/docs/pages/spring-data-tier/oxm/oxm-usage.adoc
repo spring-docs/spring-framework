@@ -1,0 +1,145 @@
+include::page$attributes.adoc[]
+[[oxm-usage]]
+=== Using `Marshaller` and `Unmarshaller`
+
+You can use Spring's OXM for a wide variety of situations. In the following example, we
+use it to marshal the settings of a Spring-managed application as an XML file. In the following example, we
+use a simple JavaBean to represent the settings:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	public class Settings {
+
+		private boolean fooEnabled;
+
+		public boolean isFooEnabled() {
+			return fooEnabled;
+		}
+
+		public void setFooEnabled(boolean fooEnabled) {
+			this.fooEnabled = fooEnabled;
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class Settings {
+		var isFooEnabled: Boolean = false
+	}
+----
+
+The application class uses this bean to store its settings. Besides a main method, the
+class has two methods: `saveSettings()` saves the settings bean to a file named
+`settings.xml`, and `loadSettings()` loads these settings again. The following `main()` method
+constructs a Spring application context and calls these two methods:
+
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+.Java
+----
+	import java.io.FileInputStream;
+	import java.io.FileOutputStream;
+	import java.io.IOException;
+	import javax.xml.transform.stream.StreamResult;
+	import javax.xml.transform.stream.StreamSource;
+	import org.springframework.context.ApplicationContext;
+	import org.springframework.context.support.ClassPathXmlApplicationContext;
+	import org.springframework.oxm.Marshaller;
+	import org.springframework.oxm.Unmarshaller;
+
+	public class Application {
+
+		private static final String FILE_NAME = "settings.xml";
+		private Settings settings = new Settings();
+		private Marshaller marshaller;
+		private Unmarshaller unmarshaller;
+
+		public void setMarshaller(Marshaller marshaller) {
+			this.marshaller = marshaller;
+		}
+
+		public void setUnmarshaller(Unmarshaller unmarshaller) {
+			this.unmarshaller = unmarshaller;
+		}
+
+		public void saveSettings() throws IOException {
+			try (FileOutputStream os = new FileOutputStream(FILE_NAME)) {
+				this.marshaller.marshal(settings, new StreamResult(os));
+			}
+		}
+
+		public void loadSettings() throws IOException {
+			try (FileInputStream is = new FileInputStream(FILE_NAME)) {
+				this.settings = (Settings) this.unmarshaller.unmarshal(new StreamSource(is));
+			}
+		}
+
+		public static void main(String[] args) throws IOException {
+			ApplicationContext appContext =
+					new ClassPathXmlApplicationContext("applicationContext.xml");
+			Application application = (Application) appContext.getBean("application");
+			application.saveSettings();
+			application.loadSettings();
+		}
+	}
+----
+[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+.Kotlin
+----
+	class Application {
+
+		lateinit var marshaller: Marshaller
+
+		lateinit var unmarshaller: Unmarshaller
+
+		fun saveSettings() {
+			FileOutputStream(FILE_NAME).use { outputStream -> marshaller.marshal(settings, StreamResult(outputStream)) }
+		}
+
+		fun loadSettings() {
+			FileInputStream(FILE_NAME).use { inputStream -> settings = unmarshaller.unmarshal(StreamSource(inputStream)) as Settings }
+		}
+	}
+
+	private const val FILE_NAME = "settings.xml"
+
+	fun main(args: Array<String>) {
+		val appContext = ClassPathXmlApplicationContext("applicationContext.xml")
+		val application = appContext.getBean("application") as Application
+		application.saveSettings()
+		application.loadSettings()
+	}
+----
+
+The `Application` requires both a `marshaller` and an `unmarshaller` property to be set. We
+can do so by using the following `applicationContext.xml`:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<beans>
+		<bean id="application" class="Application">
+			<property name="marshaller" ref="xstreamMarshaller" />
+			<property name="unmarshaller" ref="xstreamMarshaller" />
+		</bean>
+		<bean id="xstreamMarshaller" class="org.springframework.oxm.xstream.XStreamMarshaller"/>
+	</beans>
+----
+
+This application context uses XStream, but we could have used any of the other marshaller
+instances described later in this chapter. Note that, by default, XStream does not require any further
+configuration, so the bean definition is rather simple. Also note that the
+`XStreamMarshaller` implements both `Marshaller` and `Unmarshaller`, so we can refer to the
+`xstreamMarshaller` bean in both the `marshaller` and `unmarshaller` property of the
+application.
+
+This sample application produces the following `settings.xml` file:
+
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<settings foo-enabled="false"/>
+----
+
+
+

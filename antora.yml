@@ -1,0 +1,7 @@
+name: spring-framework-docs
+version: master
+title: Spring framework docs
+nav:
+  - modules/docs/nav.adoc
+
+

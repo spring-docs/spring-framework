@@ -1,0 +1,9 @@
+include::page$attributes.adoc[]
+[[webmvc-client]]
+= REST Clients
+
+This section describes options for client-side access to REST endpoints.
+
+
+
+

@@ -1,0 +1,8 @@
+include::page$attributes.adoc[]
+[[orm]]
+== Object Relational Mapping (ORM) Data Access
+
+This section covers data access when you use Object Relational Mapping (ORM).
+
+
+

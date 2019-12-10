@@ -1,0 +1,80 @@
+include::page$attributes.adoc[]
+[[remoting]]
+== Remoting and Web Services
+
+Spring provides support for remoting with various technologies.
+The remoting support eases the development of remote-enabled services, implemented
+via Java interfaces and objects as input and output. Currently, Spring supports the
+following remoting technologies:
+
+* xref:remoting:remoting-rmi.adoc#remoting-rmi[Remote Method Invocation (RMI)]: Through the use of  `RmiProxyFactoryBean` and
+  `RmiServiceExporter`, Spring supports both traditional RMI (with `java.rmi.Remote`
+  interfaces and `java.rmi.RemoteException`) and transparent remoting through RMI
+  invokers (with any Java interface).
+* xref:remoting:remoting-httpinvoker.adoc#remoting-httpinvoker[remoting-httpinvoker]: Spring provides a special remoting strategy that allows
+  for Java serialization though HTTP, supporting any Java interface (as the RMI
+  invoker does). The corresponding support classes are `HttpInvokerProxyFactoryBean`
+  and `HttpInvokerServiceExporter`.
+* xref:remoting:remoting-caucho-protocols:remoting-caucho-protocols-hessian.adoc#remoting-caucho-protocols-hessian[remoting-caucho-protocols-hessian]: By using Spring's `HessianProxyFactoryBean` and the
+  `HessianServiceExporter`, you can transparently expose your services through the
+  lightweight binary HTTP-based protocol provided by Caucho.
+* xref:remoting:remoting-web-services.adoc#remoting-web-services[remoting-web-services]: Spring provides remoting support for web services through JAX-WS.
+* xref:remoting:remoting-jms.adoc#remoting-jms[remoting-jms]: Remoting via JMS as the underlying protocol is supported through the
+  `JmsInvokerServiceExporter` and `JmsInvokerProxyFactoryBean` classes in the
+   `spring-jms` module.
+* xref:remoting:remoting-amqp.adoc#remoting-amqp[remoting-amqp]: Remoting via AMQP as the underlying protocol is supported by the
+  separate Spring AMQP project.
+
+While discussing the remoting capabilities of Spring, we use the following domain
+model and corresponding services:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public class Account implements Serializable{
+
+		private String name;
+
+		public String getName(){
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+----
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	public interface AccountService {
+
+		public void insertAccount(Account account);
+
+		public List<Account> getAccounts(String name);
+	}
+----
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	// the implementation doing nothing at the moment
+	public class AccountServiceImpl implements AccountService {
+
+		public void insertAccount(Account acc) {
+			// do something...
+		}
+
+		public List<Account> getAccounts(String name) {
+			// do something...
+		}
+	}
+----
+
+This section starts by exposing the service to a remote client by using RMI and talk a bit
+about the drawbacks of using RMI. It then continues with an example that uses Hessian as
+the protocol.
+
+
+

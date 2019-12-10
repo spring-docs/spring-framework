@@ -1,0 +1,94 @@
+include::page$attributes.adoc[]
+[[dynamic-language-final-notes]]
+== Additional Details
+
+This last section contains some additional details related to the dynamic language support.
+
+
+
+[[dynamic-language-final-notes-aop]]
+=== AOP -- Advising Scripted Beans
+
+You can use the Spring AOP framework to advise scripted beans. The Spring AOP
+framework actually is unaware that a bean that is being advised might be a scripted
+bean, so all of the AOP use cases and functionality that you use (or aim to use)
+work with scripted beans. When you advise scripted beans, you cannot use class-based
+proxies. You must use xref:aop:aop-proxying.adoc#aop-proxying[interface-based proxies].
+
+You are not limited to advising scripted beans. You can also write aspects themselves
+in a supported dynamic language and use such beans to advise other Spring beans.
+This really would be an advanced use of the dynamic language support though.
+
+
+
+[[dynamic-language-final-notes-scopes]]
+=== Scoping
+
+In case it is not immediately obvious, scripted beans can be scoped in the same way as
+any other bean. The `scope` attribute on the various `<lang:language/>` elements lets
+you control the scope of the underlying scripted bean, as it does with a regular
+bean. (The default scope is xref:beans:beans-factory-scopes:beans-factory-scopes-singleton.adoc#beans-factory-scopes-singleton[singleton],
+as it is with "`regular`" beans.)
+
+The following example uses the `scope` attribute to define a Groovy bean scoped as
+a xref:beans:beans-factory-scopes:beans-factory-scopes-prototype.adoc#beans-factory-scopes-prototype[prototype]:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:lang="http://www.springframework.org/schema/lang"
+		xsi:schemaLocation="
+			http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/lang https://www.springframework.org/schema/lang/spring-lang.xsd">
+
+		<lang:groovy id="messenger" script-source="classpath:Messenger.groovy" scope="prototype">
+			<lang:property name="message" value="I Can Do The RoboCop" />
+		</lang:groovy>
+
+		<bean id="bookingService" class="x.y.DefaultBookingService">
+			<property name="messenger" ref="messenger" />
+		</bean>
+
+	</beans>
+----
+
+See xref:beans:beans-factory-scopes.adoc#beans-factory-scopes[Bean Scopes] in xref:beans:beans.adoc#beans[The IoC Container]
+for a full discussion of the scoping support in the Spring Framework.
+
+
+
+[[xsd-schemas-lang]]
+=== The `lang` XML schema
+
+The `lang` elements in Spring XML configuration deal with exposing objects that have been
+written in a dynamic language (such as Groovy or BeanShell) as beans in the Spring container.
+
+These elements (and the dynamic language support) are comprehensively covered in
+xref:dynamic-language:dynamic-language.adoc#dynamic-language[Dynamic Language Support]. See that chapter
+for full details on this support and the `lang` elements.
+
+To use the elements in the `lang` schema, you need to have the following preamble at the
+top of your Spring XML configuration file. The text in the following snippet references
+the correct schema so that the tags in the `lang` namespace are available to you:
+
+[source,xml,indent=0]
+[subs="verbatim,quotes"]
+----
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:lang="http://www.springframework.org/schema/lang"
+		xsi:schemaLocation="
+			http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+			http://www.springframework.org/schema/lang https://www.springframework.org/schema/lang/spring-lang.xsd">
+
+		<!-- bean definitions here -->
+
+	</beans>
+----
+
+
+
+
