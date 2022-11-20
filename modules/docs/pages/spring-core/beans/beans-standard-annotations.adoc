@@ -317,6 +317,9 @@ features are not available, as the following table shows:
 | @Component
 | @Named / @ManagedBean
 | JSR-330 does not provide a composable model, only a way to identify named components.
+  This means that according to JSR-330, it is not supposed to treat, for example, a custom
+  qualifier annotation having the @Named annotation within its definition as a more
+  qualified @Named annotation or even as a @Named annotation.
 
 | @Scope("singleton")
 | @Singleton
